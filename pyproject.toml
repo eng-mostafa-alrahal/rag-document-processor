@@ -1,0 +1,60 @@
+[project]
+name = "rag-ingestion-service"
+version = "0.1.0"
+description = "RAG ingestion API with pluggable chunking/embedding and Redis stream staging."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "psycopg2-binary>=2.9.10",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt>=4.2.0,<5",
+    "PyJWT>=2.9.0",
+    "httpx>=0.27.0",
+    "aiofiles>=24.1.0",
+    "redis>=5.2.0",
+    "celery[redis]>=5.4.0",
+    "structlog>=24.4.0",
+    "aioboto3>=13.2.0",
+    "python-multipart>=0.0.17",
+    "tiktoken>=0.8.0",
+    "llama-index-core>=0.12.0",
+    "llama-index-readers-file>=0.4.0",
+    "llama-index-embeddings-openai>=0.3.0",
+    "llama-cloud>=2.1,<3",
+    "openai>=1.55.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+    "testcontainers[postgres,redis]>=4.8.0",
+    "pytest-cov>=6.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = [
+    "integration: tests that need Docker (testcontainers)",
+    "e2e: full stack HTTP tests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

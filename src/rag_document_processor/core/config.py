@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    app_name: str = Field(default="rag-ingestion", alias="APP_NAME")
+    env: str = Field(default="dev", alias="ENV")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    api_prefix: str = Field(default="/api/v1", alias="API_PREFIX")
+
+    database_url: str | None = Field(default=None, alias="DATABASE_URL")
+    database_url_sync: str | None = Field(default=None, alias="DATABASE_URL_SYNC")
+
+    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    redis_stream_db: int = Field(default=0, alias="REDIS_STREAM_DB")
+    redis_stream_maxlen: int = Field(default=10_000, alias="REDIS_STREAM_MAXLEN")
+
+    celery_broker_url: str = Field(default="redis://localhost:6379/1", alias="CELERY_BROKER_URL")
+    celery_result_backend: str = Field(default="redis://localhost:6379/2", alias="CELERY_RESULT_BACKEND")
+    celery_task_default_queue: str = Field(default="ingest", alias="CELERY_TASK_DEFAULT_QUEUE")
+
+    jwt_secret: str | None = Field(default=None, alias="JWT_SECRET")
+    jwt_refresh_secret: str | None = Field(default=None, alias="JWT_REFRESH_SECRET")
+    jwt_access_expire_minutes: int = Field(default=30, alias="JWT_ACCESS_EXPIRE_MINUTES")
+    jwt_refresh_expire_days: int = Field(default=7, alias="JWT_REFRESH_EXPIRE_DAYS")
+
+    storage_backend: Literal["local", "s3"] = Field(default="local", alias="STORAGE_BACKEND")
+    local_storage_path: str = Field(default="./data/uploads", alias="LOCAL_STORAGE_PATH")
+    s3_endpoint_url: str | None = Field(default=None, alias="S3_ENDPOINT_URL")
+    s3_access_key_id: str | None = Field(default=None, alias="S3_ACCESS_KEY_ID")
+    s3_secret_access_key: str | None = Field(default=None, alias="S3_SECRET_ACCESS_KEY")
+    s3_bucket_name: str = Field(default="rag-uploads", alias="S3_BUCKET_NAME")
+    s3_region: str = Field(default="us-east-1", alias="S3_REGION")
+
+    max_upload_bytes: int = Field(default=20 * 1024 * 1024, alias="MAX_UPLOAD_BYTES")
+    max_url_fetch_bytes: int = Field(default=20 * 1024 * 1024, alias="MAX_URL_FETCH_BYTES")
+    allowed_upload_content_types: str = Field(
+        default="application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        alias="ALLOWED_UPLOAD_CONTENT_TYPES",
+    )
+
+    embedding_pipeline: Literal["late_chunking", "chunk_then_embed"] = Field(
+        default="chunk_then_embed", alias="EMBEDDING_PIPELINE"
+    )
+    macro_splitter: Literal["semantic", "recursive", "token_aware"] = Field(
+        default="recursive", alias="MACRO_SPLITTER"
+    )
+    embedder_context_tokens: int = Field(default=8192, alias="EMBEDDER_CONTEXT_TOKENS")
+
+    jina_api_key: str | None = Field(default=None, alias="JINA_API_KEY")
+    jina_embedding_model: str = Field(default="jina-embeddings-v3", alias="JINA_EMBEDDING_MODEL")
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_embedding_model: str = Field(default="text-embedding-3-small", alias="OPENAI_EMBEDDING_MODEL")
+
+    llama_cloud_api_key: str | None = Field(default=None, alias="LLAMA_CLOUD_API_KEY")
+    llama_parse_tier: Literal["fast", "cost_effective", "agentic", "agentic_plus"] = Field(
+        default="agentic",
+        alias="LLAMA_PARSE_TIER",
+        description="LlamaCloud parse tier; agentic balances quality and cost. The 'fast' tier omits markdown.",
+    )
+
+    @model_validator(mode="after")
+    def _dev_defaults(self) -> Settings:
+        if self.env.lower() in ("dev", "development", "test"):
+            if not self.database_url:
+                object.__setattr__(
+                    self,
+                    "database_url",
+                    "postgresql+asyncpg://rag:rag@localhost:5432/rag",
+                )
+            if not self.jwt_secret:
+                object.__setattr__(self, "jwt_secret", "dev-only-access-secret-change-me-32chars")
+            if not self.jwt_refresh_secret:
+                object.__setattr__(self, "jwt_refresh_secret", "dev-only-refresh-secret-change-me-32ch")
+            if not self.openai_api_key:
+                object.__setattr__(self, "openai_api_key", "dev-openai-placeholder-not-for-production")
+        if not self.database_url:
+            raise ValueError("DATABASE_URL is required outside dev/test environments")
+        if not self.jwt_secret or not self.jwt_refresh_secret:
+            raise ValueError("JWT_SECRET and JWT_REFRESH_SECRET are required outside dev/test environments")
+        return self
+
+    @property
+    def allowed_mime_set(self) -> set[str]:
+        return {m.strip() for m in self.allowed_upload_content_types.split(",") if m.strip()}
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]
