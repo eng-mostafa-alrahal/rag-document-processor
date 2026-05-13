@@ -81,13 +81,17 @@ class ProcessIngestionJobUseCase:
                     body,
                     content_type=ctype_norm,
                     filename=source_url.rsplit("/", maxsplit=1)[-1] or None,
+                    llama_parse_tier=job.llama_parse_tier,
                 )
             else:
                 if not blob_key:
                     raise ValueError("File job missing blob_key")
                 body = await self._blobs.get_bytes(blob_key)
                 raw_text = await self._extractor.extract(
-                    body, content_type=content_type, filename=original_filename
+                    body,
+                    content_type=content_type,
+                    filename=original_filename,
+                    llama_parse_tier=job.llama_parse_tier,
                 )
 
             meta = {"job_id": str(jid), "source_kind": source_kind.value}

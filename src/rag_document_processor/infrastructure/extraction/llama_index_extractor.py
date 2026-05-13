@@ -11,7 +11,14 @@ from rag_document_processor.domain.exceptions import UnsupportedMimeTypeError
 class LlamaIndexTextExtractor(ITextExtractor):
     """Extract plain text from supported binary formats using llama-index readers."""
 
-    async def extract(self, data: bytes, *, content_type: str | None, filename: str | None) -> str:
+    async def extract(
+        self,
+        data: bytes,
+        *,
+        content_type: str | None,
+        filename: str | None,
+        llama_parse_tier: str | None = None,
+    ) -> str:
         ctype = (content_type or "").split(";")[0].strip().lower()
         suffix = Path(filename or "").suffix.lower()
         if ctype in ("text/plain", "text/markdown") or suffix in (".txt", ".md"):

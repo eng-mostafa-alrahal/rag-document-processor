@@ -60,7 +60,14 @@ class LlamaCloudParseExtractor(ITextExtractor):
             or suffix == ".docx"
         )
 
-    async def extract(self, data: bytes, *, content_type: str | None, filename: str | None) -> str:
+    async def extract(
+        self,
+        data: bytes,
+        *,
+        content_type: str | None,
+        filename: str | None,
+        llama_parse_tier: str | None = None,
+    ) -> str:
         ctype = (content_type or "").split(";")[0].strip().lower()
         suffix = Path(filename or "").suffix.lower()
 
@@ -69,7 +76,10 @@ class LlamaCloudParseExtractor(ITextExtractor):
 
         if not self._uses_cloud_parse(ctype, suffix):
             return await self._fallback.extract(
-                data, content_type=content_type, filename=filename
+                data,
+                content_type=content_type,
+                filename=filename,
+                llama_parse_tier=llama_parse_tier,
             )
 
         from llama_cloud import AsyncLlamaCloud
@@ -82,11 +92,12 @@ class LlamaCloudParseExtractor(ITextExtractor):
         )
         upload_file: tuple[str | None, bytes, str | None] = (name, data, upload_ctype)
 
+        tier = llama_parse_tier or self._settings.llama_parse_tier
         client = AsyncLlamaCloud(api_key=self._settings.llama_cloud_api_key)
         try:
             result = await client.parsing.parse(
                 upload_file=upload_file,
-                tier=self._settings.llama_parse_tier,
+                tier=tier,
                 version="latest",
                 expand=["markdown", "text"],
             )

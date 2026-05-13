@@ -26,6 +26,10 @@ class UnsupportedMimeTypeError(DomainError):
     pass
 
 
+class InvalidLlamaParseTierError(DomainError):
+    pass
+
+
 class UrlFetchError(DomainError):
     pass
 

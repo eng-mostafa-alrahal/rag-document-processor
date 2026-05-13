@@ -20,6 +20,7 @@ def _job_from_row(row: IngestionJobModel) -> IngestionJob:
         source_text=row.source_text,
         content_type=row.content_type,
         original_filename=row.original_filename,
+        llama_parse_tier=row.llama_parse_tier,
         error_message=row.error_message,
         chunks_emitted=row.chunks_emitted,
         created_at=row.created_at,
@@ -43,6 +44,7 @@ class SqlJobRepository:
         source_text: str | None = None,
         content_type: str | None = None,
         original_filename: str | None = None,
+        llama_parse_tier: str | None = None,
     ) -> IngestionJob:
         row = IngestionJobModel(
             id=job_id,
@@ -54,6 +56,7 @@ class SqlJobRepository:
             source_text=source_text,
             content_type=content_type,
             original_filename=original_filename,
+            llama_parse_tier=llama_parse_tier,
             chunks_emitted=0,
         )
         self._session.add(row)

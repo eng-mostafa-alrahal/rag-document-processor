@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from rag_document_processor.core.config import get_settings
 from rag_document_processor.core.container import build_container
+from rag_document_processor.core.db_bootstrap import ensure_postgres_database_exists, run_alembic_upgrade_head
 from rag_document_processor.core.logger import configure_logging
 from rag_document_processor.presentation.api.v1.router import api_router
 from rag_document_processor.presentation.exception_handlers import register_exception_handlers
@@ -15,6 +17,10 @@ from rag_document_processor.presentation.exception_handlers import register_exce
 async def lifespan(app: FastAPI):
     settings = get_settings()
     configure_logging(json_logs=settings.env.lower() not in ("dev", "development"), log_level=settings.log_level)
+    if settings.database_auto_create:
+        await asyncio.to_thread(ensure_postgres_database_exists, settings)
+    if settings.database_auto_migrate:
+        await asyncio.to_thread(run_alembic_upgrade_head, settings)
     container = build_container(settings)
     app.state.container = container
     yield

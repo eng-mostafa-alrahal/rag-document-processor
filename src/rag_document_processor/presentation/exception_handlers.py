@@ -8,6 +8,7 @@ from rag_document_processor.domain.exceptions import (
     FileTooLargeError,
     ForbiddenJobAccessError,
     InvalidCredentialsError,
+    InvalidLlamaParseTierError,
     JobNotFoundError,
     UnsupportedMimeTypeError,
     UrlFetchError,
@@ -40,6 +41,10 @@ def register_exception_handlers(app) -> None:
     @app.exception_handler(UnsupportedMimeTypeError)
     async def _mime(_: Request, exc: UnsupportedMimeTypeError) -> JSONResponse:
         return _err(str(exc), "unsupported_media_type", status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+
+    @app.exception_handler(InvalidLlamaParseTierError)
+    async def _bad_parse_tier(_: Request, exc: InvalidLlamaParseTierError) -> JSONResponse:
+        return _err(str(exc), "invalid_llama_parse_tier", status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @app.exception_handler(UrlFetchError)
     async def _url(_: Request, exc: UrlFetchError) -> JSONResponse:

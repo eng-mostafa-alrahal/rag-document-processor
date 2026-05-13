@@ -15,6 +15,16 @@ _SRC = _ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+# Alembic does not load `.env` by default; match app behavior so `uv run alembic upgrade head` works.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(_ROOT / ".env")
+except ImportError:
+    pass
+
+from rag_document_processor.core.config import get_settings  # noqa: E402
+from rag_document_processor.core.db_bootstrap import ensure_postgres_database_exists  # noqa: E402
 from rag_document_processor.infrastructure.db.models import Base  # noqa: E402
 
 config = context.config
@@ -27,9 +37,16 @@ target_metadata = Base.metadata
 def get_url() -> str:
     url = os.environ.get("DATABASE_URL_SYNC")
     if url:
-        return url
-    async_url = os.environ.get("DATABASE_URL", "")
-    return async_url.replace("+asyncpg", "+psycopg2")
+        url = url.strip()
+    else:
+        async_url = (os.environ.get("DATABASE_URL") or "").strip()
+        url = async_url.replace("+asyncpg", "+psycopg2")
+    if not url:
+        raise RuntimeError(
+            "Alembic needs a database URL: set DATABASE_URL_SYNC or DATABASE_URL in `.env` "
+            "(project root) or export them in your shell."
+        )
+    return url
 
 
 def run_migrations_offline() -> None:
@@ -45,6 +62,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    ensure_postgres_database_exists(get_settings())
     configuration = config.get_section(config.config_ini_section) or {}
     configuration["sqlalchemy.url"] = get_url()
     connectable = engine_from_config(

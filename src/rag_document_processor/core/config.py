@@ -6,17 +6,28 @@ from typing import Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# LlamaCloud parse tiers (API + env); keep in sync with `Settings.llama_parse_tier`.
+LLAMA_PARSE_TIER_CHOICES: frozenset[str] = frozenset(
+    ("fast", "cost_effective", "agentic", "agentic_plus")
+)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = Field(default="rag-ingestion", alias="APP_NAME")
+    app_name: str = Field(default="rag-document-processor", alias="APP_NAME")
     env: str = Field(default="dev", alias="ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     api_prefix: str = Field(default="/api/v1", alias="API_PREFIX")
 
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     database_url_sync: str | None = Field(default=None, alias="DATABASE_URL_SYNC")
+    database_auto_migrate: bool = Field(default=False, alias="DATABASE_AUTO_MIGRATE")
+    database_auto_create: bool = Field(
+        default=False,
+        alias="DATABASE_AUTO_CREATE",
+        description="When true, create the target Postgres database if missing (dev convenience; needs CREATEDB or superuser).",
+    )
 
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     redis_stream_db: int = Field(default=0, alias="REDIS_STREAM_DB")
@@ -63,7 +74,10 @@ class Settings(BaseSettings):
     llama_parse_tier: Literal["fast", "cost_effective", "agentic", "agentic_plus"] = Field(
         default="agentic",
         alias="LLAMA_PARSE_TIER",
-        description="LlamaCloud parse tier; agentic balances quality and cost. The 'fast' tier omits markdown.",
+        description=(
+            "Default LlamaCloud parse tier when a job omits `llama_parse_tier` "
+            "(see ingest API). Per-request values override for that job only."
+        ),
     )
 
     @model_validator(mode="after")
@@ -85,6 +99,18 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL is required outside dev/test environments")
         if not self.jwt_secret or not self.jwt_refresh_secret:
             raise ValueError("JWT_SECRET and JWT_REFRESH_SECRET are required outside dev/test environments")
+        if "database_auto_migrate" not in self.model_fields_set:
+            object.__setattr__(
+                self,
+                "database_auto_migrate",
+                self.env.lower() in ("dev", "development", "test"),
+            )
+        if "database_auto_create" not in self.model_fields_set:
+            object.__setattr__(
+                self,
+                "database_auto_create",
+                self.env.lower() in ("dev", "development", "test"),
+            )
         return self
 
     @property

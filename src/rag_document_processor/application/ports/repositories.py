@@ -28,6 +28,7 @@ class IJobRepository(Protocol):
         source_text: str | None = None,
         content_type: str | None = None,
         original_filename: str | None = None,
+        llama_parse_tier: str | None = None,
     ) -> IngestionJob: ...
 
     async def get_by_id(self, job_id: UUID) -> IngestionJob | None: ...

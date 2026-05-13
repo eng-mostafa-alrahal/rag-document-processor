@@ -23,6 +23,7 @@ async def job_status(
         source_kind=dto.source_kind,
         chunks_emitted=dto.chunks_emitted,
         error_message=dto.error_message,
+        llama_parse_tier=dto.llama_parse_tier,
         created_at=dto.created_at,
         updated_at=dto.updated_at,
     )

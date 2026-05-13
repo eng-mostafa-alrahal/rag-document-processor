@@ -30,6 +30,8 @@ class IngestionJob:
     source_text: str | None
     content_type: str | None
     original_filename: str | None
+    # None => worker uses Settings.llama_parse_tier (env default).
+    llama_parse_tier: str | None
     error_message: str | None
     chunks_emitted: int
     created_at: datetime

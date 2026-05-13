@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from rag_document_processor.application.use_cases.auth.auth import (
     LoginUseCase,
@@ -28,14 +29,16 @@ def get_container(request: Request) -> Container:
 
 ContainerDep = Annotated[Container, Depends(get_container)]
 
+_http_bearer = HTTPBearer(auto_error=False)
+
 
 async def get_current_user(
     request: Request,
-    authorization: Annotated[str | None, Header()] = None,
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
 ) -> User:
-    if not authorization or not authorization.lower().startswith("bearer "):
+    if creds is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-    token = authorization.split(" ", 1)[1].strip()
+    token = creds.credentials.strip()
     container = get_container(request)
     try:
         payload = container.jwt_service.decode_access(token)

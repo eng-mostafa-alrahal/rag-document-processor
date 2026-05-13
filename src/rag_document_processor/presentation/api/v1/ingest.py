@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from rag_document_processor.presentation.deps import (
     CurrentUser,
@@ -10,7 +10,6 @@ from rag_document_processor.presentation.deps import (
 )
 from rag_document_processor.presentation.schemas.ingestion import (
     JobCreatedResponse,
-    JobStatusResponse,
     TextIngestRequest,
     UrlIngestRequest,
 )
@@ -22,6 +21,10 @@ router = APIRouter(prefix="/ingest", tags=["ingest"])
 async def ingest_file(
     user: CurrentUser,
     file: UploadFile = File(...),
+    llama_parse_tier: str | None = Form(
+        default=None,
+        description="LlamaCloud parse tier for PDF/DOCX; omit to use LLAMA_PARSE_TIER from env.",
+    ),
     uc=Depends(submit_file_use_case),
 ) -> JobCreatedResponse:
     data = await file.read()
@@ -30,6 +33,7 @@ async def ingest_file(
         filename=file.filename,
         content_type=file.content_type,
         data=data,
+        llama_parse_tier=llama_parse_tier,
     )
     return JobCreatedResponse(job_id=dto.job_id)
 
@@ -40,7 +44,7 @@ async def ingest_url(
     body: UrlIngestRequest,
     uc=Depends(submit_url_use_case),
 ) -> JobCreatedResponse:
-    dto = await uc.execute(user_id=user.id, url=str(body.url))
+    dto = await uc.execute(user_id=user.id, url=str(body.url), llama_parse_tier=body.llama_parse_tier)
     return JobCreatedResponse(job_id=dto.job_id)
 
 
@@ -50,5 +54,5 @@ async def ingest_text(
     body: TextIngestRequest,
     uc=Depends(submit_text_use_case),
 ) -> JobCreatedResponse:
-    dto = await uc.execute(user_id=user.id, texts=body.texts)
+    dto = await uc.execute(user_id=user.id, texts=body.texts, llama_parse_tier=body.llama_parse_tier)
     return JobCreatedResponse(job_id=dto.job_id)

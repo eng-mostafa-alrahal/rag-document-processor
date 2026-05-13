@@ -28,6 +28,7 @@ class GetJobStatusUseCase:
             source_kind=job.source_kind.value,
             chunks_emitted=job.chunks_emitted,
             error_message=job.error_message,
+            llama_parse_tier=job.llama_parse_tier,
             created_at=job.created_at.isoformat(),
             updated_at=job.updated_at.isoformat(),
         )

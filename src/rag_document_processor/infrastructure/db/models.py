@@ -40,6 +40,7 @@ class IngestionJobModel(Base):
     original_filename: Mapped[str | None] = mapped_column(String(512), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     chunks_emitted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    llama_parse_tier: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

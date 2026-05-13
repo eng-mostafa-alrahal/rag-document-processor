@@ -29,5 +29,6 @@ class JobStatusDTO:
     source_kind: str
     chunks_emitted: int
     error_message: str | None
+    llama_parse_tier: str | None
     created_at: str
     updated_at: str
