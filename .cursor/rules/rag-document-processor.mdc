@@ -1,0 +1,44 @@
+---
+description: RAG document processor — architecture, layers, and change patterns
+alwaysApply: true
+---
+
+# RAG Document Processor (repo conventions)
+
+## Stack
+
+FastAPI (`presentation/`), Celery (`workers/`), Postgres + Alembic, Redis (Celery broker + embedding sink streams), optional S3/local blobs.
+
+## Layering (strict)
+
+- **domain/** — Pure Python: entities, domain exceptions. No FastAPI, SQLAlchemy, httpx, Celery imports.
+- **application/** — Use cases + **ports** (Protocols/ABCs) + DTOs. Orchestrate only; I/O via injected adapters.
+- **infrastructure/** — Implements ports: repos, embedders, pipelines, extractors, Redis, storage.
+- **presentation/** — Routes, Pydantic schemas, `deps.py`, `exception_handlers.py`.
+- **core/** — `Settings`, `Container`, cross-cutting validation (`embedding_dimensions`, `ingest_embedding_options`).
+
+New features should extend the right layer; avoid “god” imports from `presentation` into `domain`.
+
+## Ingestion changes
+
+- API shape: `presentation/schemas/ingestion.py` and `presentation/api/v1/ingest.py`.
+- Business rules on submit: `application/use_cases/ingestion/submit.py` (`_prepare_ingest_embedding_fields`).
+- Worker path: `application/use_cases/ingestion/process_job.py` (keep validation consistent with submit).
+- Job listing fields: `get_job_status.py` + `JobStatusResponse` (effective resolved values).
+
+## Embeddings
+
+- Rules and catalogs: `core/embedding_dimensions.py`, `presentation/api/v1/embedding_catalog.py`.
+- Pipeline wiring: `core/pipeline_factory.py`, `infrastructure/pipelines/`, `infrastructure/embedders/`.
+
+## Database
+
+Model changes need **Alembic** revision under `alembic/versions/` and updates to `infrastructure/db/models.py`.
+
+## Tests
+
+Run `uv run pytest tests/unit` after logic changes. Add or update tests next to the feature (e.g. `tests/unit/test_embedding_dimensions.py`).
+
+## Cursor usage
+
+Point the agent at `@AGENTS.md` or `@docs/ONBOARDING.md` for context. Prefer small, layer-respecting diffs.

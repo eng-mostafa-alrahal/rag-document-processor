@@ -2,6 +2,11 @@
 
 FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Celery workers extract text, run pluggable embedding pipelines, and stage vectors on **Redis Streams** for downstream consumers.
 
+## Documentation
+
+- **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — onboarding for new developers: architecture, local setup, ingest flow, tests, migrations, pitfalls, and **Cursor** tips (`@`-mentions).
+- **[AGENTS.md](AGENTS.md)** — short project map for **AI agents** (Cursor); keep this file updated when the high-level layout or commands change.
+
 ## Quick start
 
 1. Copy `.env.example` to `.env` and set secrets.
@@ -9,7 +14,7 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 3. `uv sync --extra dev`
 4. `uv run alembic upgrade head` (optional in dev: with `ENV=dev`, the API can create the DB if missing when `DATABASE_AUTO_CREATE` is on, then run migrations when `DATABASE_AUTO_MIGRATE` is on—both default on in dev)
 5. `uv run uvicorn rag_document_processor.main:app --reload --app-dir src`
-6. In another terminal: `uv run celery -A rag_document_processor.workers.celery_app worker -l info`
+6. In another terminal: `uv run celery -A rag_document_processor.workers.celery_app worker -l info` (on Windows use `--pool=solo` if the worker crashes)
 
 ## API
 
@@ -17,10 +22,13 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 - `POST /api/v1/auth/login` — access + refresh tokens
 - `POST /api/v1/auth/refresh` — rotate refresh token
 - `POST /api/v1/auth/logout` — revoke refresh jti (Redis)
-- `POST /api/v1/ingest/file` — multipart upload (Bearer); optional form field `llama_parse_tier` for LlamaCloud PDF/DOCX (`fast` | `cost_effective` | `agentic` | `agentic_plus`; defaults from `LLAMA_PARSE_TIER` in env when omitted)
-- `POST /api/v1/ingest/url` — JSON `{ "url": "...", "llama_parse_tier": "fast" }` (`llama_parse_tier` optional, same values)
-- `POST /api/v1/ingest/text` — JSON `{ "texts": ["..."] }` (optional `llama_parse_tier` accepted; ignored for plain text)
-- `GET /api/v1/jobs/{job_id}` — job status (includes `llama_parse_tier` if set at submit time)
+- `POST /api/v1/ingest/file` — multipart upload (Bearer); optional `llama_parse_tier`, `embedding_pipeline`, `macro_splitter`, `embedder_provider`, `embedding_model`, `embedding_dimensions` (see OpenAPI `/docs`)
+- `POST /api/v1/ingest/url` — JSON with `url` and the same optional ingest fields as file/text
+- `POST /api/v1/ingest/text` — JSON `{ "texts": ["..."] }` plus optional ingest fields
+- `GET /api/v1/jobs/{job_id}` — job status (effective resolved tier, pipeline, splitter, provider, `embedding_model`, dimensions, etc.)
+- `GET /api/v1/embeddings/dimension-constraints` — allowed embedding output sizes by model family (for clients and OpenAPI users)
+
+See **[docs/ONBOARDING.md](docs/ONBOARDING.md)** for architecture and operational detail.
 
 ## Configuration
 
@@ -31,6 +39,7 @@ See `.env.example`. Key settings:
 - `STORAGE_BACKEND=local|s3`
 - `EMBEDDING_PIPELINE=late_chunking|chunk_then_embed`
 - `MACRO_SPLITTER=semantic|recursive|token_aware`
+- `EMBEDDING_DIMENSIONS` — optional default output size when a job omits `embedding_dimensions` (must fit the active embedder model)
 - Jina / OpenAI keys when using those embedders
 - `LLAMA_CLOUD_API_KEY` / `LLAMA_PARSE_TIER` — optional cloud PDF/DOCX parse; tier defaults from env, overridable per ingest request
 
