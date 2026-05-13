@@ -7,65 +7,23 @@ import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from rag_document_processor.application.ports.blob_storage import IBlobStorage
-from rag_document_processor.application.ports.embedding_pipeline import IEmbeddingPipeline, IMacroSplitter
+from rag_document_processor.application.ports.embedding_pipeline import IEmbeddingPipeline
 from rag_document_processor.application.ports.text_extractor import ITextExtractor
 from rag_document_processor.core.config import Settings
+from rag_document_processor.core.ingest_embedding_options import resolve_ingest_embedding_options
+from rag_document_processor.core.pipeline_factory import build_embedding_pipeline
 from rag_document_processor.infrastructure.db.session import create_engine as create_async_db_engine
 from rag_document_processor.infrastructure.db.session import create_session_factory
-from rag_document_processor.infrastructure.embedders.jina_embedder import JinaEmbedder
-from rag_document_processor.infrastructure.embedders.openai_embedder import OpenAIEmbedder
 from rag_document_processor.infrastructure.extraction.http_url_fetcher import HttpUrlFetcher
 from rag_document_processor.infrastructure.extraction.llama_cloud_parse_extractor import LlamaCloudParseExtractor
 from rag_document_processor.infrastructure.extraction.llama_index_extractor import LlamaIndexTextExtractor
-from rag_document_processor.infrastructure.pipelines.embedding_pipelines import ChunkThenEmbedPipeline, LateChunkingPipeline
 from rag_document_processor.infrastructure.queue.celery_task_queue import CeleryTaskQueue
 from rag_document_processor.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
 from rag_document_processor.infrastructure.security.jwt_service import JwtTokenService
 from rag_document_processor.infrastructure.security.redis_refresh_store import RedisRefreshTokenStore
 from rag_document_processor.infrastructure.sinks.redis_stream_sink import RedisStreamSink
-from rag_document_processor.infrastructure.splitters.macro_splitters import (
-    RecursiveMacroSplitter,
-    SemanticMacroSplitter,
-    TokenAwareMacroSplitter,
-)
-from rag_document_processor.infrastructure.splitters.sentence_chunker import RecursiveSentenceChunker
 from rag_document_processor.infrastructure.storage.local_blob_storage import LocalBlobStorage
 from rag_document_processor.infrastructure.storage.s3_blob_storage import S3BlobStorage
-
-
-def _build_macro_splitter(settings: Settings) -> IMacroSplitter:
-    if settings.macro_splitter == "semantic":
-        if not settings.openai_api_key:
-            return RecursiveMacroSplitter()
-        return SemanticMacroSplitter(openai_api_key=settings.openai_api_key)
-    if settings.macro_splitter == "token_aware":
-        return TokenAwareMacroSplitter(max_tokens=settings.embedder_context_tokens)
-    return RecursiveMacroSplitter()
-
-
-def _build_embedding_pipeline(settings: Settings, httpx_client: httpx.AsyncClient) -> IEmbeddingPipeline:
-    macro = _build_macro_splitter(settings)
-    if settings.embedding_pipeline == "late_chunking":
-        if not settings.jina_api_key:
-            raise RuntimeError("JINA_API_KEY is required when EMBEDDING_PIPELINE=late_chunking")
-        embedder = JinaEmbedder(
-            api_key=settings.jina_api_key,
-            model=settings.jina_embedding_model,
-            client=httpx_client,
-        )
-        return LateChunkingPipeline(macro_splitter=macro, embedder=embedder)
-    if not settings.openai_api_key and not settings.jina_api_key:
-        raise RuntimeError("OPENAI_API_KEY or JINA_API_KEY required when EMBEDDING_PIPELINE=chunk_then_embed")
-    chunker = RecursiveSentenceChunker()
-    if settings.openai_api_key:
-        embedder = OpenAIEmbedder(api_key=settings.openai_api_key, model=settings.openai_embedding_model)
-    else:
-        embedder = JinaEmbedder(
-            api_key=settings.jina_api_key or "",
-            model=settings.jina_embedding_model,
-            client=httpx_client,
-        )
-    return ChunkThenEmbedPipeline(chunker=chunker, embedder=embedder)
 
 
 def _build_blob_storage(settings: Settings) -> IBlobStorage:
@@ -79,6 +37,18 @@ def _build_text_extractor(settings: Settings) -> ITextExtractor:
     if settings.llama_cloud_api_key:
         return LlamaCloudParseExtractor(settings=settings, fallback=local)
     return local
+
+
+def _build_embedding_pipeline(settings: Settings, httpx_client: httpx.AsyncClient) -> IEmbeddingPipeline:
+    resolved = resolve_ingest_embedding_options(
+        settings,
+        job_embedding_pipeline=None,
+        job_macro_splitter=None,
+        job_embedder_provider=None,
+        job_openai_embedding_model=None,
+        job_jina_embedding_model=None,
+    )
+    return build_embedding_pipeline(settings, httpx_client, resolved)
 
 
 @dataclass

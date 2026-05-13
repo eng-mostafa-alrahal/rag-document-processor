@@ -29,6 +29,12 @@ class IJobRepository(Protocol):
         content_type: str | None = None,
         original_filename: str | None = None,
         llama_parse_tier: str | None = None,
+        embedding_dimensions: int | None = None,
+        embedding_pipeline: str | None = None,
+        macro_splitter: str | None = None,
+        embedder_provider: str | None = None,
+        openai_embedding_model: str | None = None,
+        jina_embedding_model: str | None = None,
     ) -> IngestionJob: ...
 
     async def get_by_id(self, job_id: UUID) -> IngestionJob | None: ...

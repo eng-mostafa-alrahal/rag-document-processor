@@ -26,7 +26,7 @@ async def _async_process(job_id: str) -> None:
             blob_storage=container.blob_storage,
             url_fetcher=container.url_fetcher,
             text_extractor=container.text_extractor,
-            pipeline=container.embedding_pipeline,
+            httpx_client=container.httpx_client,
             sink=container.embedding_sink,
             settings=settings,
         )

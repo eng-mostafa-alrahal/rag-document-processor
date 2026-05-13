@@ -32,6 +32,14 @@ class IngestionJob:
     original_filename: str | None
     # None => worker uses Settings.llama_parse_tier (env default).
     llama_parse_tier: str | None
+    # None => worker uses Settings.embedding_dimensions (env default).
+    embedding_dimensions: int | None
+    # None => worker uses Settings.* for each field (deployment defaults).
+    embedding_pipeline: str | None
+    macro_splitter: str | None
+    embedder_provider: str | None
+    openai_embedding_model: str | None
+    jina_embedding_model: str | None
     error_message: str | None
     chunks_emitted: int
     created_at: datetime

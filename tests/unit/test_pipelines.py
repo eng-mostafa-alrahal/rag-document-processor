@@ -10,7 +10,14 @@ from rag_document_processor.infrastructure.splitters.macro_splitters import Recu
 class FakeEmbedder(IEmbedder):
     name = "fake"
 
-    async def embed_texts(self, texts: list[str], *, late_chunking: bool = False) -> list[tuple[float, ...]]:
+    async def embed_texts(
+        self,
+        texts: list[str],
+        *,
+        late_chunking: bool = False,
+        dimensions: int | None = None,
+    ) -> list[tuple[float, ...]]:
+        _ = dimensions
         return [tuple(float(i + 1) for _ in range(4)) for i, _ in enumerate(texts)]
 
 

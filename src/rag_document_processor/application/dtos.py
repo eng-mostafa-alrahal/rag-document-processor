@@ -29,6 +29,11 @@ class JobStatusDTO:
     source_kind: str
     chunks_emitted: int
     error_message: str | None
-    llama_parse_tier: str | None
+    llama_parse_tier: str
+    embedding_dimensions: int | None
+    embedding_pipeline: str
+    macro_splitter: str
+    embedder_provider: str
+    embedding_model: str
     created_at: str
     updated_at: str

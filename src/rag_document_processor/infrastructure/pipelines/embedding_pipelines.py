@@ -26,19 +26,30 @@ class LateChunkingPipeline(IEmbeddingPipeline):
         self._macro = macro_splitter
         self._embedder = embedder
 
-    async def process(self, text: str, *, metadata: dict[str, Any]) -> AsyncIterator[EmbeddedChunk]:
+    async def process(
+        self,
+        text: str,
+        *,
+        metadata: dict[str, Any],
+        embedding_dimensions: int | None = None,
+    ) -> AsyncIterator[EmbeddedChunk]:
         macro_idx = 0
+        meta = {**metadata}
+        if embedding_dimensions is not None:
+            meta["embedding_dimensions"] = embedding_dimensions
         async for block in self._macro.split(text):
             sents = _sentences(block)
             if not sents:
                 macro_idx += 1
                 continue
-            vectors = await self._embedder.embed_texts(sents, late_chunking=True)
+            vectors = await self._embedder.embed_texts(
+                sents, late_chunking=True, dimensions=embedding_dimensions
+            )
             for i, (sent, vec) in enumerate(zip(sents, vectors, strict=True)):
                 yield EmbeddedChunk(
                     sent,
                     vec,
-                    {**metadata, "macro_index": macro_idx, "sentence_index": i, "pipeline": self.name},
+                    {**meta, "macro_index": macro_idx, "sentence_index": i, "pipeline": self.name},
                 )
             macro_idx += 1
 
@@ -52,9 +63,20 @@ class ChunkThenEmbedPipeline(IEmbeddingPipeline):
         self._chunker: IChunker = chunker
         self._embedder = embedder
 
-    async def process(self, text: str, *, metadata: dict[str, Any]) -> AsyncIterator[EmbeddedChunk]:
+    async def process(
+        self,
+        text: str,
+        *,
+        metadata: dict[str, Any],
+        embedding_dimensions: int | None = None,
+    ) -> AsyncIterator[EmbeddedChunk]:
         idx = 0
+        meta = {**metadata}
+        if embedding_dimensions is not None:
+            meta["embedding_dimensions"] = embedding_dimensions
         async for seg in self._chunker.chunk(text):
-            vectors = await self._embedder.embed_texts([seg], late_chunking=False)
-            yield EmbeddedChunk(seg, vectors[0], {**metadata, "chunk_index": idx, "pipeline": self.name})
+            vectors = await self._embedder.embed_texts(
+                [seg], late_chunking=False, dimensions=embedding_dimensions
+            )
+            yield EmbeddedChunk(seg, vectors[0], {**meta, "chunk_index": idx, "pipeline": self.name})
             idx += 1

@@ -25,11 +25,23 @@ class IChunker(Protocol):
 class IEmbedder(Protocol):
     name: str
 
-    async def embed_texts(self, texts: list[str], *, late_chunking: bool = False) -> list[tuple[float, ...]]:
+    async def embed_texts(
+        self,
+        texts: list[str],
+        *,
+        late_chunking: bool = False,
+        dimensions: int | None = None,
+    ) -> list[tuple[float, ...]]:
         """Return one embedding vector per input text (same order)."""
 
 
 class IEmbeddingPipeline(Protocol):
     name: str
 
-    async def process(self, text: str, *, metadata: dict[str, Any]) -> AsyncIterator[EmbeddedChunk]: ...
+    async def process(
+        self,
+        text: str,
+        *,
+        metadata: dict[str, Any],
+        embedding_dimensions: int | None = None,
+    ) -> AsyncIterator[EmbeddedChunk]: ...

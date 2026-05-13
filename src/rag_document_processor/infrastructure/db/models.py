@@ -41,6 +41,12 @@ class IngestionJobModel(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     chunks_emitted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     llama_parse_tier: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    embedding_dimensions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    embedding_pipeline: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    macro_splitter: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    embedder_provider: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    openai_embedding_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    jina_embedding_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

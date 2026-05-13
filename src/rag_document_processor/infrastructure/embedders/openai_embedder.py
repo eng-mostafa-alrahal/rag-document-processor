@@ -12,11 +12,20 @@ class OpenAIEmbedder(IEmbedder):
         self._client = AsyncOpenAI(api_key=api_key)
         self._model = model
 
-    async def embed_texts(self, texts: list[str], *, late_chunking: bool = False) -> list[tuple[float, ...]]:
+    async def embed_texts(
+        self,
+        texts: list[str],
+        *,
+        late_chunking: bool = False,
+        dimensions: int | None = None,
+    ) -> list[tuple[float, ...]]:
         if late_chunking:
             raise ValueError("OpenAI embedder does not support late_chunking")
         if not texts:
             return []
-        resp = await self._client.embeddings.create(model=self._model, input=texts)
+        kwargs: dict = {"model": self._model, "input": texts}
+        if dimensions is not None:
+            kwargs["dimensions"] = dimensions
+        resp = await self._client.embeddings.create(**kwargs)
         items = sorted(resp.data, key=lambda d: d.index)
         return [tuple(float(x) for x in item.embedding) for item in items]

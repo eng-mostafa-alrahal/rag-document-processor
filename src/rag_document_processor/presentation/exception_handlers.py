@@ -8,6 +8,8 @@ from rag_document_processor.domain.exceptions import (
     FileTooLargeError,
     ForbiddenJobAccessError,
     InvalidCredentialsError,
+    InvalidEmbeddingDimensionsError,
+    InvalidIngestEmbeddingOptionsError,
     InvalidLlamaParseTierError,
     JobNotFoundError,
     UnsupportedMimeTypeError,
@@ -45,6 +47,16 @@ def register_exception_handlers(app) -> None:
     @app.exception_handler(InvalidLlamaParseTierError)
     async def _bad_parse_tier(_: Request, exc: InvalidLlamaParseTierError) -> JSONResponse:
         return _err(str(exc), "invalid_llama_parse_tier", status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @app.exception_handler(InvalidEmbeddingDimensionsError)
+    async def _bad_embedding_dim(_: Request, exc: InvalidEmbeddingDimensionsError) -> JSONResponse:
+        body: dict[str, object] = {"detail": str(exc), "code": "invalid_embedding_dimensions"}
+        body.update(exc.payload)
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=body)
+
+    @app.exception_handler(InvalidIngestEmbeddingOptionsError)
+    async def _bad_ingest_embed_opts(_: Request, exc: InvalidIngestEmbeddingOptionsError) -> JSONResponse:
+        return _err(str(exc), "invalid_ingest_embedding_options", status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @app.exception_handler(UrlFetchError)
     async def _url(_: Request, exc: UrlFetchError) -> JSONResponse:

@@ -13,13 +13,22 @@ class JinaEmbedder(IEmbedder):
         self._model = model
         self._client = client
 
-    async def embed_texts(self, texts: list[str], *, late_chunking: bool = False) -> list[tuple[float, ...]]:
+    async def embed_texts(
+        self,
+        texts: list[str],
+        *,
+        late_chunking: bool = False,
+        dimensions: int | None = None,
+    ) -> list[tuple[float, ...]]:
         if not texts:
             return []
+        payload: dict = {"model": self._model, "input": texts, "late_chunking": late_chunking}
+        if dimensions is not None:
+            payload["dimensions"] = dimensions
         resp = await self._client.post(
             "https://api.jina.ai/v1/embeddings",
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
-            json={"model": self._model, "input": texts, "late_chunking": late_chunking},
+            json=payload,
             timeout=120.0,
         )
         resp.raise_for_status()

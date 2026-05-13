@@ -6,6 +6,9 @@ from typing import Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from rag_document_processor.core.embedding_dimensions import validate_embedding_dimensions
+from rag_document_processor.core.ingest_embedding_options import resolve_ingest_embedding_options
+
 # LlamaCloud parse tiers (API + env); keep in sync with `Settings.llama_parse_tier`.
 LLAMA_PARSE_TIER_CHOICES: frozenset[str] = frozenset(
     ("fast", "cost_effective", "agentic", "agentic_plus")
@@ -79,6 +82,14 @@ class Settings(BaseSettings):
             "(see ingest API). Per-request values override for that job only."
         ),
     )
+    embedding_dimensions: int | None = Field(
+        default=None,
+        alias="EMBEDDING_DIMENSIONS",
+        description=(
+            "Default output embedding size when a job omits `embedding_dimensions` "
+            "(Matryoshka / OpenAI `dimensions`). Must fit the active embedder model."
+        ),
+    )
 
     @model_validator(mode="after")
     def _dev_defaults(self) -> Settings:
@@ -111,6 +122,20 @@ class Settings(BaseSettings):
                 "database_auto_create",
                 self.env.lower() in ("dev", "development", "test"),
             )
+        _resolved = resolve_ingest_embedding_options(
+            self,
+            job_embedding_pipeline=None,
+            job_macro_splitter=None,
+            job_embedder_provider=None,
+            job_openai_embedding_model=None,
+            job_jina_embedding_model=None,
+        )
+        validate_embedding_dimensions(
+            embedder=_resolved.embedder,
+            openai_embedding_model=_resolved.openai_embedding_model,
+            jina_embedding_model=_resolved.jina_embedding_model,
+            dim=self.embedding_dimensions,
+        )
         return self
 
     @property

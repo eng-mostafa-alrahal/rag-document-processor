@@ -84,12 +84,12 @@ def submit_file_use_case(container: ContainerDep) -> SubmitFileIngestionUseCase:
 
 
 def submit_url_use_case(container: ContainerDep) -> SubmitUrlIngestionUseCase:
-    return SubmitUrlIngestionUseCase(container.session_factory, container.task_queue)
+    return SubmitUrlIngestionUseCase(container.session_factory, container.task_queue, container.settings)
 
 
 def submit_text_use_case(container: ContainerDep) -> SubmitTextIngestionUseCase:
-    return SubmitTextIngestionUseCase(container.session_factory, container.task_queue)
+    return SubmitTextIngestionUseCase(container.session_factory, container.task_queue, container.settings)
 
 
 def get_job_status_use_case(container: ContainerDep) -> GetJobStatusUseCase:
-    return GetJobStatusUseCase(container.session_factory)
+    return GetJobStatusUseCase(container.session_factory, container.settings)

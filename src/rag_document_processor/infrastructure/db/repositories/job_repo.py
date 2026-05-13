@@ -21,6 +21,12 @@ def _job_from_row(row: IngestionJobModel) -> IngestionJob:
         content_type=row.content_type,
         original_filename=row.original_filename,
         llama_parse_tier=row.llama_parse_tier,
+        embedding_dimensions=row.embedding_dimensions,
+        embedding_pipeline=row.embedding_pipeline,
+        macro_splitter=row.macro_splitter,
+        embedder_provider=row.embedder_provider,
+        openai_embedding_model=row.openai_embedding_model,
+        jina_embedding_model=row.jina_embedding_model,
         error_message=row.error_message,
         chunks_emitted=row.chunks_emitted,
         created_at=row.created_at,
@@ -45,6 +51,12 @@ class SqlJobRepository:
         content_type: str | None = None,
         original_filename: str | None = None,
         llama_parse_tier: str | None = None,
+        embedding_dimensions: int | None = None,
+        embedding_pipeline: str | None = None,
+        macro_splitter: str | None = None,
+        embedder_provider: str | None = None,
+        openai_embedding_model: str | None = None,
+        jina_embedding_model: str | None = None,
     ) -> IngestionJob:
         row = IngestionJobModel(
             id=job_id,
@@ -57,6 +69,12 @@ class SqlJobRepository:
             content_type=content_type,
             original_filename=original_filename,
             llama_parse_tier=llama_parse_tier,
+            embedding_dimensions=embedding_dimensions,
+            embedding_pipeline=embedding_pipeline,
+            macro_splitter=macro_splitter,
+            embedder_provider=embedder_provider,
+            openai_embedding_model=openai_embedding_model,
+            jina_embedding_model=jina_embedding_model,
             chunks_emitted=0,
         )
         self._session.add(row)

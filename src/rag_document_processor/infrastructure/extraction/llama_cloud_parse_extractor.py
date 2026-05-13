@@ -94,12 +94,14 @@ class LlamaCloudParseExtractor(ITextExtractor):
 
         tier = llama_parse_tier or self._settings.llama_parse_tier
         client = AsyncLlamaCloud(api_key=self._settings.llama_cloud_api_key)
+        # FAST tier does not support markdown expansion (LlamaCloud returns 400).
+        expand = ["text"] if str(tier).strip().lower() == "fast" else ["markdown", "text"]
         try:
             result = await client.parsing.parse(
                 upload_file=upload_file,
                 tier=tier,
                 version="latest",
-                expand=["markdown", "text"],
+                expand=expand,
             )
         finally:
             await client.close()
