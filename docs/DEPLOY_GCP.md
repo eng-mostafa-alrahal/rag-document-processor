@@ -54,12 +54,14 @@ sudo usermod -aG docker "$USER"
 Close SSH, open a **new** SSH session, then:
 
 ```bash
-git clone https://github.com/YOUR_ORG/rag-document-processor.git
+git clone -b stage https://github.com/YOUR_ORG/rag-document-processor.git
 cd rag-document-processor
 
 cp .env.example .env
 nano .env
 ```
+
+Deployments track the **`stage`** branch. Use `main` for stable code; merge into `stage` when you want the VM updated.
 
 Set at least (compose overrides DB/Redis/MinIO hostnames; secrets stay in `.env`):
 
@@ -92,7 +94,7 @@ docker run --rm --network "$NETWORK" minio/mc mb local/rag-uploads --ignore-exis
 
 In your GitHub repo: **Settings → Secrets and variables → Actions**.
 
-Create an **Environment** named `production` (**Settings → Environments → New**). Add secrets there (recommended) or at repo level.
+Create an **Environment** named `staging` (**Settings → Environments → New**). Add secrets there (recommended) or at repo level. Deploys run from the **`stage`** branch into this environment.
 
 | Secret | Example | Description |
 |--------|---------|-------------|
@@ -129,14 +131,21 @@ Use a **deploy key** so `git fetch` on the VM works:
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N ""
 cat ~/.ssh/github_deploy.pub   # add as Deploy key in GitHub repo settings (read-only)
-git clone git@github.com:YOUR_ORG/rag-document-processor.git
+git clone -b stage git@github.com:YOUR_ORG/rag-document-processor.git
 ```
 
 ## Part 4 — How CI/CD works
 
+### Branches
+
+| Branch | Role |
+|--------|------|
+| `main` | Default branch; CI runs on push/PR. Workflow definitions live here. |
+| `stage` | **Deploy branch** — pushes here deploy to the GCP VM after CI passes. |
+
 ### CI (`.github/workflows/ci.yml`)
 
-Runs on every **push** and **pull request** to `main`:
+Runs on every **push** and **pull request** to `main` or `stage`:
 
 1. `uv sync --extra dev`
 2. `uv run pytest tests/unit -q`
@@ -146,14 +155,14 @@ Runs on every **push** and **pull request** to `main`:
 
 Runs when:
 
-- CI **succeeds** on a push to `main`, or
+- CI **succeeds** on a push to **`stage`**, or
 - You click **Run workflow** manually (`workflow_dispatch`)
 
 Steps over SSH:
 
 ```bash
 cd $DEPLOY_PATH
-git fetch origin main && git reset --hard origin/main
+git fetch origin stage && git checkout stage && git reset --hard origin/stage
 docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 ```
 
@@ -161,15 +170,22 @@ Watch runs under **Actions** in GitHub.
 
 ## Part 5 — Day-to-day workflow
 
-1. Open a PR → CI runs tests.
-2. Merge to `main` → CI runs → Deploy updates the VM.
+1. Open a PR into `stage` (or `main`) → CI runs tests.
+2. Merge to **`stage`** → CI runs → Deploy updates the VM.
 3. Check `http://YOUR_VM_IP:8000/docs`.
+
+If the VM was cloned from `main`, switch it once:
+
+```bash
+cd ~/rag-document-processor
+git fetch origin stage
+git checkout stage
+```
 
 Manual deploy on the VM:
 
 ```bash
 cd ~/rag-document-processor
-git pull origin main
 ./scripts/deploy.sh
 ```
 

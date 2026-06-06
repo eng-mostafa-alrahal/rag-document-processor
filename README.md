@@ -53,4 +53,4 @@ uv run pytest tests/integration -m integration -q   # requires Docker
 
 ## CI/CD
 
-GitHub Actions runs unit tests and a Docker build on every push/PR (`.github/workflows/ci.yml`). Merges to `main` deploy to a GCP VM over SSH (`.github/workflows/deploy.yml`). See **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** for VM setup and GitHub secrets.
+GitHub Actions runs unit tests and a Docker build on every push/PR to `main` or `stage` (`.github/workflows/ci.yml`). Pushes to **`stage`** deploy to a GCP VM over SSH (`.github/workflows/deploy.yml`). See **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** for VM setup and GitHub secrets.

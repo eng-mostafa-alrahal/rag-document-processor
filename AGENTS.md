@@ -49,7 +49,7 @@ Prefer unit tests under `tests/unit/`; integration tests may need Docker (`tests
 ## Deploy / CI
 
 - **CI:** `.github/workflows/ci.yml` — unit tests + Docker build on push/PR.
-- **CD:** `.github/workflows/deploy.yml` — SSH to GCP VM, `docker compose -f docker-compose.prod.yml up -d --build`.
+- **CD:** `.github/workflows/deploy.yml` — on push to **`stage`**, SSH to GCP VM and deploy that branch.
 - **Docs:** `docs/DEPLOY_GCP.md`, `docker-compose.prod.yml`, `docker-compose.debug.yml`, `scripts/deploy.sh`.
 
 ## When unsure
