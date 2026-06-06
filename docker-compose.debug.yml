@@ -1,0 +1,23 @@
+# Optional override: bind Postgres, Redis, and MinIO console to VM localhost only.
+# Use with SSH port forwarding from your laptop — never expose these ports publicly.
+#
+# On the VM:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.debug.yml up -d
+#
+# On your laptop (PowerShell / terminal):
+#   ssh -L 5432:localhost:5432 -L 6379:localhost:6379 -L 9001:localhost:9001 USER@VM_IP
+#
+# Then connect GUI tools to localhost (Postgres: rag/rag, Redis: no password,
+# MinIO console: http://localhost:9001 — minioadmin/minioadmin).
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  minio:
+    ports:
+      - "127.0.0.1:9001:9001"

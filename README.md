@@ -5,6 +5,7 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 ## Documentation
 
 - **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — onboarding for new developers: architecture, local setup, ingest flow, tests, migrations, pitfalls, and **Cursor** tips (`@`-mentions).
+- **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** — budget GCP VM deploy + **GitHub Actions** CI/CD.
 - **[AGENTS.md](AGENTS.md)** — short project map for **AI agents** (Cursor); keep this file updated when the high-level layout or commands change.
 
 ## Quick start
@@ -49,3 +50,7 @@ See `.env.example`. Key settings:
 uv run pytest tests/unit -q
 uv run pytest tests/integration -m integration -q   # requires Docker
 ```
+
+## CI/CD
+
+GitHub Actions runs unit tests and a Docker build on every push/PR (`.github/workflows/ci.yml`). Merges to `main` deploy to a GCP VM over SSH (`.github/workflows/deploy.yml`). See **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** for VM setup and GitHub secrets.

@@ -46,6 +46,12 @@ Windows Celery: add `--pool=solo` if the default pool fails.
 
 Prefer unit tests under `tests/unit/`; integration tests may need Docker (`tests/integration/`).
 
+## Deploy / CI
+
+- **CI:** `.github/workflows/ci.yml` — unit tests + Docker build on push/PR.
+- **CD:** `.github/workflows/deploy.yml` — SSH to GCP VM, `docker compose -f docker-compose.prod.yml up -d --build`.
+- **Docs:** `docs/DEPLOY_GCP.md`, `docker-compose.prod.yml`, `docker-compose.debug.yml`, `scripts/deploy.sh`.
+
 ## When unsure
 
 Read `docs/ONBOARDING.md` or ask the user which layer owns the change.
