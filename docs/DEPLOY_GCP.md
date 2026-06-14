@@ -315,6 +315,7 @@ docker compose -f docker-compose.prod.yml exec redis redis-cli
 | Issue | Check |
 |-------|--------|
 | Deploy fails SSH | `SSH_HOST`, `SSH_USER`, key in `authorized_keys`, firewall allows port 22 |
+| Deploy `Run Command Timeout` | First deploy on e2-micro can take 15–30+ min (Docker build). Workflow uses `command_timeout: 60m`; or SSH to VM and run `./scripts/deploy.sh` once, then re-run Actions |
 | API up, jobs pending | `docker compose -f docker-compose.prod.yml logs worker` |
 | DB errors | `docker compose -f docker-compose.prod.yml logs api` (migrations on startup) |
 | Upload errors | MinIO bucket `rag-uploads` exists |
