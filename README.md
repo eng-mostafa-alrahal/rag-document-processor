@@ -6,7 +6,7 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 
 - **[docs/API_INTEGRATION.md](docs/API_INTEGRATION.md)** — **for other teams / projects**: authentication, ingest flow, polling, fetching results, code examples (Python, JS, curl).
 - **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — onboarding for new developers: architecture, local setup, ingest flow, tests, migrations, pitfalls, and **Cursor** tips (`@`-mentions).
-- **[docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md)** — **production deploy**: Cloud Run + Cloud SQL + GitHub Actions.
+- **[docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md)** — **step-by-step production deploy** (Cloud Run + Cloud SQL + GitHub Actions).
 - **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** — legacy VM deploy (deprecated).
 - **[AGENTS.md](AGENTS.md)** — short project map for **AI agents** (Cursor); keep this file updated when the high-level layout or commands change.
 

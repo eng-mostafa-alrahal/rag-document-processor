@@ -31,6 +31,7 @@ gcloud artifacts repositories create "$AR_REPO" \
 echo "Creating Cloud SQL Postgres (ignore if exists)..."
 gcloud sql instances create "$SQL_INSTANCE" \
   --database-version=POSTGRES_16 \
+  --edition=enterprise \
   --tier=db-f1-micro \
   --region="$REGION" \
   --root-password="${SQL_ROOT_PASSWORD:?Set SQL_ROOT_PASSWORD}" 2>/dev/null || true

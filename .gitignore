@@ -4,6 +4,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .env
+gcp-github-deploy-key.json
 .venv/
 venv/
 data/

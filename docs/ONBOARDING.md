@@ -132,7 +132,7 @@ Add **unit** tests next to the module you change; use **integration** when real 
 
 ## Deploy / production
 
-Production runs on **Google Cloud Run** — see [DEPLOY_CLOUD_RUN.md](./DEPLOY_CLOUD_RUN.md). CI deploys on push to `stage`.
+Production runs on **Google Cloud Run** — follow the step-by-step guide in [DEPLOY_CLOUD_RUN.md](./DEPLOY_CLOUD_RUN.md). CI deploys on push to `stage`.
 
 ## Questions
 
