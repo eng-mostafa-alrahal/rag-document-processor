@@ -344,11 +344,11 @@ If you already pushed, trigger deploy manually (Step 11).
 
 ### Step 11 — Run the Deploy workflow
 
-**Option A — Automatic (push to `stage`):**
+**Option A — Push to `stage` (automatic):**
 
 1. Push any commit to `stage`.
-2. **Actions** tab → wait for **CI** to finish green.
-3. **Deploy** workflow starts automatically after CI succeeds.
+2. **Deploy** runs immediately (Cloud Run workflow from the `stage` branch).
+3. **CI** runs in parallel on the same push — check both under **Actions**.
 
 **Option B — Manual (no new commit):**
 
@@ -480,9 +480,8 @@ git merge main          # or commit directly on stage
 git push origin stage
 ```
 
-1. **CI** runs (tests + Docker build).
-2. **Deploy** runs automatically when CI passes.
-3. Check Actions log for `Health check passed`.
+1. **CI** and **Deploy** both run on push to `stage` (in parallel).
+2. Check the **Deploy** log for `Health check passed`.
 
 Manual redeploy without a new commit: **Actions → Deploy → Run workflow**.
 
@@ -518,6 +517,7 @@ Manual redeploy without a new commit: **Actions → Deploy → Run workflow**.
 
 | Symptom | What to check |
 |---------|---------------|
+| Deploy uses **appleboy/ssh-action** / `missing server host` | Old workflow on `main` — push latest `stage` (deploy now triggers on push, not `workflow_run`) |
 | Deploy fails at **Authenticate to Google Cloud** | `GCP_SA_KEY` is valid JSON (entire file pasted, including `{` and `}`) |
 | Deploy fails at **docker push** | Service account has `roles/artifactregistry.writer`; Artifact Registry repo `rag` exists in `GCP_REGION` |
 | Deploy fails at **gcloud run deploy** | `CLOUD_SQL_CONNECTION_NAME` correct; SA has `roles/run.admin` and `roles/cloudsql.client` |
