@@ -110,8 +110,9 @@ jobs:
             --region "${{ env.GCP_REGION }}" \
             --platform managed \
             --image "$IMAGE" \
-            --command celery \
-            --args=-A,rag_document_processor.workers.celery_app,worker,-l,info,--concurrency=1 \
+            --port 8080 \
+            --command sh \
+            --args=scripts/cloudrun_celery_worker.sh \
             --no-allow-unauthenticated \
             --ingress internal \
             --no-cpu-throttling \

@@ -524,6 +524,7 @@ Manual redeploy without a new commit: **Actions → Deploy → Run workflow**.
 | Health check fails | Cloud Run logs: `gcloud run services logs read rag-api --region us-central1 --limit 50` |
 | API crash: `API_KEY_ADMIN_SECRET is required` | Secret missing in **staging** environment (not repo-level only) |
 | Jobs stay `pending` | Worker not running — check `gcloud run services logs read rag-worker --region us-central1` |
+| Worker deploy: **startup probe timed out** | Fixed by `scripts/cloudrun_celery_worker.sh` (Celery + HTTP health on `$PORT`) |
 | Upload / S3 errors | HMAC keys correct; bucket name matches `S3_BUCKET_NAME` |
 | DB connection errors | `DATABASE_URL` uses `/cloudsql/CONNECTION_NAME`; Cloud SQL instance attached on both services |
 
