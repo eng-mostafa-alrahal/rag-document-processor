@@ -29,8 +29,20 @@ jobs:
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
-            git fetch origin stage
-            git checkout stage
-            git reset --hard origin/stage
-            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+
+            if [[ ! -f .env ]]; then
+              echo "ERROR: .env is missing on the VM." >&2
+              echo "One-time setup: cp .env.example .env && nano .env (see docs/DEPLOY_GCP.md)" >&2
+              exit 1
+            fi
+
+            chmod +x scripts/deploy.sh
+            ./scripts/deploy.sh
+
+            NETWORK=$(docker network ls --format '{{.Name}}' | grep rag-document-processor | head -1)
+            docker run --rm --network "$NETWORK" minio/mc alias set local http://minio:9000 minioadmin minioadmin
+            docker run --rm --network "$NETWORK" minio/mc mb local/rag-uploads --ignore-existing
+
             docker compose -f docker-compose.prod.yml ps
+            curl -sf http://localhost:8000/api/v1/health
+            echo "Deploy OK — health check passed"
