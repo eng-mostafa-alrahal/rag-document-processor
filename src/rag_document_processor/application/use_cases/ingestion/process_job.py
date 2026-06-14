@@ -58,7 +58,6 @@ class ProcessIngestionJobUseCase:
                 return
             if job.status == JobStatus.COMPLETED:
                 return
-            user_id = job.user_id
             source_kind = job.source_kind
             blob_key = job.blob_key
             source_url = job.source_url
@@ -76,7 +75,7 @@ class ProcessIngestionJobUseCase:
             await session.commit()
 
         try:
-            await self._sink.clear(jid, user_id)
+            await self._sink.clear(jid)
 
             if source_kind == SourceKind.TEXT:
                 raw_text = source_text or ""
@@ -134,10 +133,10 @@ class ProcessIngestionJobUseCase:
             }
             chunks = 0
             async for chunk in pipeline.process(raw_text, metadata=meta, embedding_dimensions=dims):
-                await self._sink.emit(jid, user_id, chunk)
+                await self._sink.emit(jid, chunk)
                 chunks += 1
 
-            await self._sink.finalize(jid, user_id, metadata={"chunks": str(chunks)})
+            await self._sink.finalize(jid, metadata={"chunks": str(chunks)})
 
             async with self._session_factory() as session:
                 jobs = SqlJobRepository(session)

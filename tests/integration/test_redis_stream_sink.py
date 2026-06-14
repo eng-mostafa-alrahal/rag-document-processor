@@ -28,12 +28,11 @@ async def test_redis_stream_sink_writes_chunks() -> None:
         client = redis.from_url(url, decode_responses=True)
         sink = RedisStreamSink(client, maxlen=1000)
         job_id = uuid.uuid4()
-        user_id = uuid.uuid4()
-        await sink.clear(job_id, user_id)
+        await sink.clear(job_id)
         chunk = EmbeddedChunk("hello", (0.1, 0.2), {"a": 1})
-        await sink.emit(job_id, user_id, chunk)
-        await sink.finalize(job_id, user_id, metadata={"x": "y"})
-        key = f"ingest:{user_id}:{job_id}"
+        await sink.emit(job_id, chunk)
+        await sink.finalize(job_id, metadata={"x": "y"})
+        key = f"ingest:{job_id}"
         entries = await client.xrange(key)
         assert len(entries) >= 2
         fields = entries[0][1]

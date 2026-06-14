@@ -4,18 +4,16 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from rag_document_processor.domain.exceptions import (
+    ApiKeyNotFoundError,
     DomainError,
     FileTooLargeError,
-    ForbiddenJobAccessError,
-    InvalidCredentialsError,
     InvalidEmbeddingDimensionsError,
     InvalidIngestEmbeddingOptionsError,
     InvalidLlamaParseTierError,
     JobNotFoundError,
+    JobResultsNotReadyError,
     UnsupportedMimeTypeError,
     UrlFetchError,
-    UserAlreadyExistsError,
-    UserInactiveError,
 )
 
 
@@ -24,17 +22,9 @@ def _err(detail: str, code: str, status_code: int) -> JSONResponse:
 
 
 def register_exception_handlers(app) -> None:
-    @app.exception_handler(InvalidCredentialsError)
-    async def _invalid_credentials(_: Request, __: InvalidCredentialsError) -> JSONResponse:
-        return _err("Invalid credentials", "invalid_credentials", status.HTTP_401_UNAUTHORIZED)
-
-    @app.exception_handler(UserInactiveError)
-    async def _inactive(_: Request, __: UserInactiveError) -> JSONResponse:
-        return _err("User inactive", "user_inactive", status.HTTP_403_FORBIDDEN)
-
-    @app.exception_handler(UserAlreadyExistsError)
-    async def _exists(_: Request, __: UserAlreadyExistsError) -> JSONResponse:
-        return _err("User already exists", "user_exists", status.HTTP_409_CONFLICT)
+    @app.exception_handler(ApiKeyNotFoundError)
+    async def _api_key_nf(_: Request, __: ApiKeyNotFoundError) -> JSONResponse:
+        return _err("API key not found", "api_key_not_found", status.HTTP_404_NOT_FOUND)
 
     @app.exception_handler(FileTooLargeError)
     async def _too_large(_: Request, exc: FileTooLargeError) -> JSONResponse:
@@ -66,9 +56,13 @@ def register_exception_handlers(app) -> None:
     async def _job_nf(_: Request, __: JobNotFoundError) -> JSONResponse:
         return _err("Job not found", "job_not_found", status.HTTP_404_NOT_FOUND)
 
-    @app.exception_handler(ForbiddenJobAccessError)
-    async def _forbidden_job(_: Request, __: ForbiddenJobAccessError) -> JSONResponse:
-        return _err("Forbidden", "forbidden", status.HTTP_403_FORBIDDEN)
+    @app.exception_handler(JobResultsNotReadyError)
+    async def _job_results_not_ready(_: Request, __: JobResultsNotReadyError) -> JSONResponse:
+        return _err(
+            "Ingestion results not ready; poll GET /jobs/{job_id} until status is completed or failed",
+            "job_results_not_ready",
+            status.HTTP_409_CONFLICT,
+        )
 
     @app.exception_handler(DomainError)
     async def _domain(_: Request, exc: DomainError) -> JSONResponse:

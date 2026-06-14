@@ -12,7 +12,6 @@ from rag_document_processor.infrastructure.db.models import IngestionJobModel
 def _job_from_row(row: IngestionJobModel) -> IngestionJob:
     return IngestionJob(
         id=row.id,
-        user_id=row.user_id,
         status=JobStatus(row.status),
         source_kind=SourceKind(row.source_kind),
         blob_key=row.blob_key,
@@ -42,7 +41,6 @@ class SqlJobRepository:
         self,
         *,
         job_id: UUID,
-        user_id: UUID,
         source_kind: SourceKind,
         status: JobStatus,
         blob_key: str | None = None,
@@ -60,7 +58,6 @@ class SqlJobRepository:
     ) -> IngestionJob:
         row = IngestionJobModel(
             id=job_id,
-            user_id=user_id,
             status=status.value,
             source_kind=source_kind.value,
             blob_key=blob_key,

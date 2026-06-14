@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from rag_document_processor.presentation.deps import (
-    CurrentUser,
+    ApiKeyDep,
     submit_file_use_case,
     submit_text_use_case,
     submit_url_use_case,
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/ingest", tags=["ingest"])
 
 @router.post("/file", response_model=JobCreatedResponse)
 async def ingest_file(
-    user: CurrentUser,
+    _: ApiKeyDep,
     file: UploadFile = File(..., description="PDF, DOCX, plain text, or markdown (see ALLOWED_UPLOAD_CONTENT_TYPES on server)."),
     llama_parse_tier: str | None = Form(default=None, description=FORM_DESC_LLAMA_PARSE_TIER),
     embedding_dimensions: int | None = Form(default=None, description=FORM_DESC_EMBEDDING_DIMENSIONS),
@@ -41,7 +41,6 @@ async def ingest_file(
     """
     data = await file.read()
     dto = await uc.execute(
-        user_id=user.id,
         filename=file.filename,
         content_type=file.content_type,
         data=data,
@@ -57,13 +56,12 @@ async def ingest_file(
 
 @router.post("/url", response_model=JobCreatedResponse)
 async def ingest_url(
-    user: CurrentUser,
+    _: ApiKeyDep,
     body: UrlIngestRequest,
     uc=Depends(submit_url_use_case),
 ) -> JobCreatedResponse:
     """Enqueue ingestion by fetching a URL (for example a hosted PDF or DOCX)."""
     dto = await uc.execute(
-        user_id=user.id,
         url=str(body.url),
         llama_parse_tier=body.llama_parse_tier,
         embedding_dimensions=body.embedding_dimensions,
@@ -77,13 +75,12 @@ async def ingest_url(
 
 @router.post("/text", response_model=JobCreatedResponse)
 async def ingest_text(
-    user: CurrentUser,
+    _: ApiKeyDep,
     body: TextIngestRequest,
     uc=Depends(submit_text_use_case),
 ) -> JobCreatedResponse:
     """Enqueue ingestion from raw UTF-8 text segments in the JSON body."""
     dto = await uc.execute(
-        user_id=user.id,
         texts=body.texts,
         llama_parse_tier=body.llama_parse_tier,
         embedding_dimensions=body.embedding_dimensions,

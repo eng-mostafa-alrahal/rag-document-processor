@@ -18,9 +18,7 @@ from rag_document_processor.infrastructure.extraction.http_url_fetcher import Ht
 from rag_document_processor.infrastructure.extraction.llama_cloud_parse_extractor import LlamaCloudParseExtractor
 from rag_document_processor.infrastructure.extraction.llama_index_extractor import LlamaIndexTextExtractor
 from rag_document_processor.infrastructure.queue.celery_task_queue import CeleryTaskQueue
-from rag_document_processor.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
-from rag_document_processor.infrastructure.security.jwt_service import JwtTokenService
-from rag_document_processor.infrastructure.security.redis_refresh_store import RedisRefreshTokenStore
+from rag_document_processor.infrastructure.sinks.redis_stream_result_reader import RedisStreamResultReader
 from rag_document_processor.infrastructure.sinks.redis_stream_sink import RedisStreamSink
 from rag_document_processor.infrastructure.storage.local_blob_storage import LocalBlobStorage
 from rag_document_processor.infrastructure.storage.s3_blob_storage import S3BlobStorage
@@ -58,11 +56,9 @@ class Container:
     session_factory: async_sessionmaker[AsyncSession]
     redis: redis.Redis
     httpx_client: httpx.AsyncClient
-    password_hasher: BcryptPasswordHasher
-    jwt_service: JwtTokenService
-    refresh_store: RedisRefreshTokenStore
     blob_storage: IBlobStorage
     embedding_sink: RedisStreamSink
+    ingestion_result_reader: RedisStreamResultReader
     url_fetcher: HttpUrlFetcher
     text_extractor: ITextExtractor
     embedding_pipeline: IEmbeddingPipeline
@@ -79,11 +75,9 @@ def build_container(settings: Settings) -> Container:
     session_factory = create_session_factory(engine)
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     httpx_client = httpx.AsyncClient()
-    password_hasher = BcryptPasswordHasher()
-    jwt_service = JwtTokenService(settings)
-    refresh_store = RedisRefreshTokenStore(redis_client)
     blob_storage = _build_blob_storage(settings)
     embedding_sink = RedisStreamSink(redis_client, maxlen=settings.redis_stream_maxlen)
+    ingestion_result_reader = RedisStreamResultReader(redis_client)
     url_fetcher = HttpUrlFetcher(settings, httpx_client)
     text_extractor = _build_text_extractor(settings)
     embedding_pipeline = _build_embedding_pipeline(settings, httpx_client)
@@ -94,11 +88,9 @@ def build_container(settings: Settings) -> Container:
         session_factory=session_factory,
         redis=redis_client,
         httpx_client=httpx_client,
-        password_hasher=password_hasher,
-        jwt_service=jwt_service,
-        refresh_store=refresh_store,
         blob_storage=blob_storage,
         embedding_sink=embedding_sink,
+        ingestion_result_reader=ingestion_result_reader,
         url_fetcher=url_fetcher,
         text_extractor=text_extractor,
         embedding_pipeline=embedding_pipeline,

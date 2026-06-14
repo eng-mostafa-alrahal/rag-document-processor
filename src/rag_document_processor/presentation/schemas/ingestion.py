@@ -229,3 +229,36 @@ class JobStatusResponse(BaseModel):
     )
     created_at: str = Field(description="ISO 8601 timestamp when the job was created.")
     updated_at: str = Field(description="ISO 8601 timestamp of the last status update.")
+
+
+class JobChunkResultResponse(BaseModel):
+    index: int = Field(description="Zero-based position of this chunk in the ingestion stream.")
+    text: str = Field(description="Chunk text ready for retrieval or display.")
+    embedding: list[float] = Field(description="Embedding vector for this chunk.")
+    metadata: dict[str, object] = Field(
+        default_factory=dict,
+        description="Pipeline metadata (job_id, source_kind, splitter, embedder, etc.).",
+    )
+
+
+class JobResultsResponse(BaseModel):
+    job_id: UUID
+    status: str = Field(description=f"Job lifecycle state. Values: {_JOB_STATUS_VALUES}.")
+    source_kind: str = Field(description=f"How the job was submitted. Values: {_SOURCE_KIND_VALUES}.")
+    chunks_emitted: int = Field(description="Number of chunks recorded on the job after processing.")
+    error_message: str | None = Field(
+        default=None,
+        description="Failure reason when status is failed; null otherwise.",
+    )
+    embedding_dimensions: int | None = Field(
+        default=None,
+        description="Effective embedding vector size for chunks in this response.",
+    )
+    embedding_model: str = Field(description="Effective embedding model id used for this job.")
+    chunks: list[JobChunkResultResponse] = Field(
+        description="All embedded text chunks staged for this job (text + vectors + metadata).",
+    )
+    finalization_metadata: dict[str, object] | None = Field(
+        default=None,
+        description="Metadata from the stream finalization event (e.g. total chunk count).",
+    )

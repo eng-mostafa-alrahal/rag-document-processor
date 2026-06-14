@@ -22,7 +22,6 @@ class SourceKind(StrEnum):
 @dataclass(frozen=True, slots=True)
 class IngestionJob:
     id: UUID
-    user_id: UUID
     status: JobStatus
     source_kind: SourceKind
     blob_key: str | None

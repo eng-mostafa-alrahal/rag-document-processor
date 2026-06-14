@@ -6,7 +6,7 @@ Welcome. This guide orients you to the codebase, local development, and how we e
 
 - **HTTP API (FastAPI)** accepts ingestion jobs: **file** (multipart), **URL**, or **raw text**.
 - **Celery workers** pull jobs from the queue, extract text, run an **embedding pipeline**, and write vector chunks to a **Redis Stream** for downstream RAG/indexing.
-- **Postgres** stores users, jobs, and job metadata. **Blob storage** (local or S3) holds uploaded bytes.
+- **Postgres** stores API keys, jobs, and job metadata. **Blob storage** (local or S3) holds uploaded bytes.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ Welcome. This guide orients you to the codebase, local development, and how we e
    ```bash
    uv run uvicorn rag_document_processor.main:app --reload --app-dir src
    ```
-   Open **http://127.0.0.1:8000/docs** for Swagger (Bearer auth for protected routes).
+   Open **http://127.0.0.1:8000/docs** for Swagger (`X-API-Key` auth for protected routes).
 
 7. **Run a Celery worker** (second terminal; same `.env`)
    ```bash
@@ -53,7 +53,7 @@ Welcome. This guide orients you to the codebase, local development, and how we e
    On **Windows**, if you see pool-related crashes, try `--pool=solo`.
 
 8. **Smoke test**
-   - Register / login via `/api/v1/auth/*`, then submit a small **text** ingest and poll **`GET /api/v1/jobs/{job_id}`**.
+   - Mint a key: `uv run python scripts/create_api_key.py "dev"`, then submit a small **text** ingest with the `X-API-Key` header and poll **`GET /api/v1/jobs/{job_id}`**.
 
 ## Architecture (Clean Architecture)
 
@@ -84,9 +84,9 @@ When you add behavior, ask: *Is this business rule (domain), orchestration (appl
 
 ## API surface (quick reference)
 
-- **Auth:** `POST …/auth/register`, `login`, `refresh`, `logout`.
-- **Ingest:** `POST …/ingest/file`, `…/ingest/url`, `…/ingest/text` (Bearer). Optional fields are described in OpenAPI (`/docs`).
-- **Jobs:** `GET …/jobs/{job_id}` returns **effective** resolved options (not raw nulls for “used env default”).
+- **Auth / API keys:** `POST/GET …/api-keys`, `DELETE …/api-keys/{id}` (admin via `X-Admin-Secret`). Clients authenticate with `X-API-Key`.
+- **Ingest:** `POST …/ingest/file`, `…/ingest/url`, `…/ingest/text` (`X-API-Key`). Optional fields are described in OpenAPI (`/docs`).
+- **Jobs:** `GET …/jobs/{job_id}` returns **effective** resolved options (not raw nulls for “used env default”). `GET …/jobs/{job_id}/results` returns all embedded chunks for RAG consumers (API reads Redis internally).
 - **Embedding dimensions:** `GET …/embeddings/dimension-constraints` lists supported **min/max** (and notes) per model family for OpenAPI clients.
 
 ## Tests

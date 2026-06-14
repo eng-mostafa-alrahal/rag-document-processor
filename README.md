@@ -4,6 +4,7 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 
 ## Documentation
 
+- **[docs/API_INTEGRATION.md](docs/API_INTEGRATION.md)** — **for other teams / projects**: authentication, ingest flow, polling, fetching results, code examples (Python, JS, curl).
 - **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — onboarding for new developers: architecture, local setup, ingest flow, tests, migrations, pitfalls, and **Cursor** tips (`@`-mentions).
 - **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** — budget GCP VM deploy + **GitHub Actions** CI/CD.
 - **[AGENTS.md](AGENTS.md)** — short project map for **AI agents** (Cursor); keep this file updated when the high-level layout or commands change.
@@ -17,19 +18,30 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 5. `uv run uvicorn rag_document_processor.main:app --reload --app-dir src`
 6. In another terminal: `uv run celery -A rag_document_processor.workers.celery_app worker -l info` (on Windows use `--pool=solo` if the worker crashes)
 
+## Authentication
+
+The service is API-key based: any client holding a valid key may use it. Keys are
+stored hashed in Postgres and managed by an operator.
+
+- Clients send their key as the `X-API-Key` header on ingest/jobs requests.
+- Key management endpoints (`/api/v1/api-keys`) are protected by a shared admin secret
+  sent as the `X-Admin-Secret` header (set `API_KEY_ADMIN_SECRET`).
+- Bootstrap the first key from the CLI: `uv run python scripts/create_api_key.py "my client"`.
+  The full secret is shown **once**.
+
 ## API
 
-- `POST /api/v1/auth/register` — register
-- `POST /api/v1/auth/login` — access + refresh tokens
-- `POST /api/v1/auth/refresh` — rotate refresh token
-- `POST /api/v1/auth/logout` — revoke refresh jti (Redis)
-- `POST /api/v1/ingest/file` — multipart upload (Bearer); optional `llama_parse_tier`, `embedding_pipeline`, `macro_splitter`, `embedder_provider`, `embedding_model`, `embedding_dimensions` (see OpenAPI `/docs`)
+- `POST /api/v1/api-keys` — create a key (admin; returns the secret once)
+- `GET /api/v1/api-keys` — list keys (admin; secrets never returned)
+- `DELETE /api/v1/api-keys/{key_id}` — revoke a key (admin)
+- `POST /api/v1/ingest/file` — multipart upload (`X-API-Key`); optional `llama_parse_tier`, `embedding_pipeline`, `macro_splitter`, `embedder_provider`, `embedding_model`, `embedding_dimensions` (see OpenAPI `/docs`)
 - `POST /api/v1/ingest/url` — JSON with `url` and the same optional ingest fields as file/text
 - `POST /api/v1/ingest/text` — JSON `{ "texts": ["..."] }` plus optional ingest fields
 - `GET /api/v1/jobs/{job_id}` — job status (effective resolved tier, pipeline, splitter, provider, `embedding_model`, dimensions, etc.)
+- `GET /api/v1/jobs/{job_id}/results` — all embedded chunks (text + vectors + metadata) for downstream RAG; poll status until `completed` or `failed`
 - `GET /api/v1/embeddings/dimension-constraints` — allowed embedding output sizes by model family (for clients and OpenAPI users)
 
-See **[docs/ONBOARDING.md](docs/ONBOARDING.md)** for architecture and operational detail.
+See **[docs/API_INTEGRATION.md](docs/API_INTEGRATION.md)** for a full guide for external consumers, or **[docs/ONBOARDING.md](docs/ONBOARDING.md)** for architecture and operational detail.
 
 ## Configuration
 

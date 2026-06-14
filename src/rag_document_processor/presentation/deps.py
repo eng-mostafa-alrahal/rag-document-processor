@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import secrets
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import APIKeyHeader
 
-from rag_document_processor.application.use_cases.auth.auth import (
-    LoginUseCase,
-    LogoutUseCase,
-    RefreshTokenUseCase,
-    RegisterUserUseCase,
+from rag_document_processor.application.use_cases.api_keys.manage import (
+    CreateApiKeyUseCase,
+    ListApiKeysUseCase,
+    RevokeApiKeyUseCase,
 )
+from rag_document_processor.application.use_cases.ingestion.get_job_results import GetJobResultsUseCase
 from rag_document_processor.application.use_cases.ingestion.get_job_status import GetJobStatusUseCase
 from rag_document_processor.application.use_cases.ingestion.submit import (
     SubmitFileIngestionUseCase,
@@ -19,8 +19,9 @@ from rag_document_processor.application.use_cases.ingestion.submit import (
     SubmitUrlIngestionUseCase,
 )
 from rag_document_processor.core.container import Container
-from rag_document_processor.domain.entities.user import User
-from rag_document_processor.infrastructure.db.repositories.user_repo import SqlUserRepository
+from rag_document_processor.domain.entities.api_key import ApiKey
+from rag_document_processor.infrastructure.db.repositories.api_key_repo import SqlApiKeyRepository
+from rag_document_processor.infrastructure.security.api_key_hashing import hash_api_key
 
 
 def get_container(request: Request) -> Container:
@@ -29,52 +30,53 @@ def get_container(request: Request) -> Container:
 
 ContainerDep = Annotated[Container, Depends(get_container)]
 
-_http_bearer = HTTPBearer(auto_error=False)
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+_admin_secret_header = APIKeyHeader(name="X-Admin-Secret", auto_error=False)
 
 
-async def get_current_user(
+async def require_api_key(
     request: Request,
-    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
-) -> User:
-    if creds is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-    token = creds.credentials.strip()
+    api_key: Annotated[str | None, Depends(_api_key_header)],
+) -> ApiKey:
+    if not api_key or not api_key.strip():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
     container = get_container(request)
-    try:
-        payload = container.jwt_service.decode_access(token)
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token")
-    if payload.get("type") != "access":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
-    try:
-        uid = UUID(str(payload["sub"]))
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid subject") from exc
+    key_hash = hash_api_key(api_key)
     async with container.session_factory() as session:
-        repo = SqlUserRepository(session)
-        user = await repo.get_by_id(uid)
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return user
+        repo = SqlApiKeyRepository(session)
+        key = await repo.get_active_by_hash(key_hash)
+        if key is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+        await repo.touch_last_used(key.id)
+        await session.commit()
+    return key
 
 
-CurrentUser = Annotated[User, Depends(get_current_user)]
+ApiKeyDep = Annotated[ApiKey, Depends(require_api_key)]
 
 
-def register_user_use_case(container: ContainerDep) -> RegisterUserUseCase:
-    return RegisterUserUseCase(container.session_factory, container.password_hasher)
+async def require_admin(
+    request: Request,
+    admin_secret: Annotated[str | None, Depends(_admin_secret_header)],
+) -> None:
+    configured = get_container(request).settings.api_key_admin_secret
+    if not configured or not admin_secret or not secrets.compare_digest(admin_secret, configured):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin secret")
 
 
-def login_use_case(container: ContainerDep) -> LoginUseCase:
-    return LoginUseCase(container.session_factory, container.password_hasher, container.jwt_service)
+AdminGuard = Depends(require_admin)
 
 
-def refresh_use_case(container: ContainerDep) -> RefreshTokenUseCase:
-    return RefreshTokenUseCase(container.session_factory, container.jwt_service, container.refresh_store)
+def create_api_key_use_case(container: ContainerDep) -> CreateApiKeyUseCase:
+    return CreateApiKeyUseCase(container.session_factory)
 
 
-def logout_use_case(container: ContainerDep) -> LogoutUseCase:
-    return LogoutUseCase(container.jwt_service, container.refresh_store)
+def list_api_keys_use_case(container: ContainerDep) -> ListApiKeysUseCase:
+    return ListApiKeysUseCase(container.session_factory)
+
+
+def revoke_api_key_use_case(container: ContainerDep) -> RevokeApiKeyUseCase:
+    return RevokeApiKeyUseCase(container.session_factory)
 
 
 def submit_file_use_case(container: ContainerDep) -> SubmitFileIngestionUseCase:
@@ -93,3 +95,9 @@ def submit_text_use_case(container: ContainerDep) -> SubmitTextIngestionUseCase:
 
 def get_job_status_use_case(container: ContainerDep) -> GetJobStatusUseCase:
     return GetJobStatusUseCase(container.session_factory, container.settings)
+
+
+def get_job_results_use_case(container: ContainerDep) -> GetJobResultsUseCase:
+    return GetJobResultsUseCase(
+        container.session_factory, container.ingestion_result_reader, container.settings
+    )

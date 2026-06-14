@@ -4,7 +4,9 @@ Concise context for **AI coding agents** (e.g. Cursor). For full onboarding, rea
 
 ## Project
 
-FastAPI API + Celery workers: ingest **file / URL / text** → extract → embed → emit chunks to **Redis Streams**. Postgres for jobs/users; optional **LlamaCloud** parse for PDF/DOCX.
+FastAPI API + Celery workers: ingest **file / URL / text** → extract → embed → emit chunks to **Redis Streams**. Postgres for jobs + API keys; optional **LlamaCloud** parse for PDF/DOCX.
+
+**Auth:** API-key based (no users/JWT). Clients send `X-API-Key`; keys are stored hashed in `api_keys` and managed via `/api/v1/api-keys` (guarded by `API_KEY_ADMIN_SECRET` sent as `X-Admin-Secret`). Bootstrap with `scripts/create_api_key.py`. Jobs are global (no per-key ownership).
 
 ## Commands (from repo root)
 

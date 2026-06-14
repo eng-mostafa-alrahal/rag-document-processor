@@ -3,16 +3,20 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
+from rag_document_processor.domain.entities.api_key import ApiKey
 from rag_document_processor.domain.entities.job import IngestionJob, JobStatus, SourceKind
-from rag_document_processor.domain.entities.user import User
 
 
-class IUserRepository(Protocol):
-    async def create(self, user: User) -> User: ...
+class IApiKeyRepository(Protocol):
+    async def create(self, *, key_id: UUID, name: str, key_prefix: str, key_hash: str) -> ApiKey: ...
 
-    async def get_by_email(self, email: str) -> User | None: ...
+    async def get_active_by_hash(self, key_hash: str) -> ApiKey | None: ...
 
-    async def get_by_id(self, user_id: UUID) -> User | None: ...
+    async def list_all(self) -> list[ApiKey]: ...
+
+    async def revoke(self, key_id: UUID) -> bool: ...
+
+    async def touch_last_used(self, key_id: UUID) -> None: ...
 
 
 class IJobRepository(Protocol):
@@ -20,7 +24,6 @@ class IJobRepository(Protocol):
         self,
         *,
         job_id: UUID,
-        user_id: UUID,
         source_kind: SourceKind,
         status: JobStatus,
         blob_key: str | None = None,

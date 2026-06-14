@@ -2,19 +2,7 @@ class DomainError(Exception):
     """Base for domain-level errors."""
 
 
-class InvalidCredentialsError(DomainError):
-    pass
-
-
-class UserAlreadyExistsError(DomainError):
-    pass
-
-
-class UserInactiveError(DomainError):
-    pass
-
-
-class InvalidRefreshTokenError(DomainError):
+class ApiKeyNotFoundError(DomainError):
     pass
 
 
@@ -52,5 +40,5 @@ class JobNotFoundError(DomainError):
     pass
 
 
-class ForbiddenJobAccessError(DomainError):
-    pass
+class JobResultsNotReadyError(DomainError):
+    """Raised when ingestion results are not yet available (job still running)."""

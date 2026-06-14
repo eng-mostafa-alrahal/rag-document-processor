@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -104,7 +104,6 @@ class SubmitFileIngestionUseCase:
     async def execute(
         self,
         *,
-        user_id: UUID,
         filename: str | None,
         content_type: str | None,
         data: bytes,
@@ -130,13 +129,12 @@ class SubmitFileIngestionUseCase:
             embedding_dimensions=embedding_dimensions,
         )
         job_id = uuid4()
-        key = f"{user_id}/{job_id}/{filename or 'upload'}"
+        key = f"{job_id}/{filename or 'upload'}"
         await self._blobs.put(key, data, content_type=ctype)
         async with self._session_factory() as session:
             jobs: IJobRepository = SqlJobRepository(session)
             await jobs.create(
                 job_id=job_id,
-                user_id=user_id,
                 source_kind=SourceKind.FILE,
                 status=JobStatus.PENDING,
                 blob_key=key,
@@ -169,7 +167,6 @@ class SubmitUrlIngestionUseCase:
     async def execute(
         self,
         *,
-        user_id: UUID,
         url: str,
         llama_parse_tier: str | None = None,
         embedding_dimensions: int | None = None,
@@ -192,7 +189,6 @@ class SubmitUrlIngestionUseCase:
             jobs: IJobRepository = SqlJobRepository(session)
             await jobs.create(
                 job_id=job_id,
-                user_id=user_id,
                 source_kind=SourceKind.URL,
                 status=JobStatus.PENDING,
                 source_url=url.strip(),
@@ -223,7 +219,6 @@ class SubmitTextIngestionUseCase:
     async def execute(
         self,
         *,
-        user_id: UUID,
         texts: list[str],
         llama_parse_tier: str | None = None,
         embedding_dimensions: int | None = None,
@@ -249,7 +244,6 @@ class SubmitTextIngestionUseCase:
             jobs: IJobRepository = SqlJobRepository(session)
             await jobs.create(
                 job_id=job_id,
-                user_id=user_id,
                 source_kind=SourceKind.TEXT,
                 status=JobStatus.PENDING,
                 source_text=joined,

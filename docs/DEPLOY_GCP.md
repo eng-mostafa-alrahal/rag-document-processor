@@ -66,11 +66,16 @@ Deployments track the **`stage`** branch. Use `main` for stable code; merge into
 Set at least (compose overrides DB/Redis/MinIO hostnames; secrets stay in `.env`):
 
 ```env
-JWT_SECRET=long-random-string-min-32-chars
-JWT_REFRESH_SECRET=another-long-random-string-min-32-chars
+API_KEY_ADMIN_SECRET=long-random-string
 OPENAI_API_KEY=sk-...
 # JINA_API_KEY=...
 # LLAMA_CLOUD_API_KEY=...
+```
+
+After the stack is up, mint a client API key (shown once):
+
+```bash
+docker compose -f docker-compose.prod.yml exec api python scripts/create_api_key.py "first client"
 ```
 
 Postgres, Redis, and MinIO are **not** installed on the VM separately — `docker-compose.prod.yml` starts them as containers when you deploy. You only need Docker and git on the host.

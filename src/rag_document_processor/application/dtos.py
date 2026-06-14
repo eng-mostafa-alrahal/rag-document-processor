@@ -5,16 +5,22 @@ from uuid import UUID
 
 
 @dataclass(frozen=True, slots=True)
-class TokenPairDTO:
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
+class ApiKeyDTO:
+    id: UUID
+    name: str
+    key_prefix: str
+    is_active: bool
+    created_at: str
+    last_used_at: str | None
 
 
 @dataclass(frozen=True, slots=True)
-class UserPublicDTO:
+class ApiKeyCreatedDTO:
     id: UUID
-    email: str
+    name: str
+    key_prefix: str
+    api_key: str
+    created_at: str
 
 
 @dataclass(frozen=True, slots=True)

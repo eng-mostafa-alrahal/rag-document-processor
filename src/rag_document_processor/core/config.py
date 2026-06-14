@@ -40,10 +40,15 @@ class Settings(BaseSettings):
     celery_result_backend: str = Field(default="redis://localhost:6379/2", alias="CELERY_RESULT_BACKEND")
     celery_task_default_queue: str = Field(default="ingest", alias="CELERY_TASK_DEFAULT_QUEUE")
 
-    jwt_secret: str | None = Field(default=None, alias="JWT_SECRET")
-    jwt_refresh_secret: str | None = Field(default=None, alias="JWT_REFRESH_SECRET")
-    jwt_access_expire_minutes: int = Field(default=30, alias="JWT_ACCESS_EXPIRE_MINUTES")
-    jwt_refresh_expire_days: int = Field(default=7, alias="JWT_REFRESH_EXPIRE_DAYS")
+    api_key_admin_secret: str | None = Field(
+        default=None,
+        alias="API_KEY_ADMIN_SECRET",
+        description=(
+            "Shared secret that protects the API key management endpoints "
+            "(create/list/revoke). Send it as the `X-Admin-Secret` header. "
+            "Required outside dev/test."
+        ),
+    )
 
     storage_backend: Literal["local", "s3"] = Field(default="local", alias="STORAGE_BACKEND")
     local_storage_path: str = Field(default="./data/uploads", alias="LOCAL_STORAGE_PATH")
@@ -100,16 +105,14 @@ class Settings(BaseSettings):
                     "database_url",
                     "postgresql+asyncpg://rag:rag@localhost:5432/rag",
                 )
-            if not self.jwt_secret:
-                object.__setattr__(self, "jwt_secret", "dev-only-access-secret-change-me-32chars")
-            if not self.jwt_refresh_secret:
-                object.__setattr__(self, "jwt_refresh_secret", "dev-only-refresh-secret-change-me-32ch")
+            if not self.api_key_admin_secret:
+                object.__setattr__(self, "api_key_admin_secret", "dev-only-admin-secret-change-me")
             if not self.openai_api_key:
                 object.__setattr__(self, "openai_api_key", "dev-openai-placeholder-not-for-production")
         if not self.database_url:
             raise ValueError("DATABASE_URL is required outside dev/test environments")
-        if not self.jwt_secret or not self.jwt_refresh_secret:
-            raise ValueError("JWT_SECRET and JWT_REFRESH_SECRET are required outside dev/test environments")
+        if not self.api_key_admin_secret:
+            raise ValueError("API_KEY_ADMIN_SECRET is required outside dev/test environments")
         if "database_auto_migrate" not in self.model_fields_set:
             object.__setattr__(
                 self,
