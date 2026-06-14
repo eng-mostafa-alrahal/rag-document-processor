@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from rag_document_processor.core.embedding_dimensions import validate_embedding_dimensions
@@ -95,6 +95,13 @@ class Settings(BaseSettings):
             "(Matryoshka / OpenAI `dimensions`). Must fit the active embedder model."
         ),
     )
+
+    @field_validator("embedding_dimensions", mode="before")
+    @classmethod
+    def _empty_embedding_dimensions_as_none(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not str(v).strip()):
+            return None
+        return v
 
     @model_validator(mode="after")
     def _dev_defaults(self) -> Settings:
