@@ -22,7 +22,7 @@ Processing is **asynchronous**: submit returns immediately with a `job_id`; a ba
 | Environment | Base URL |
 |-------------|----------|
 | **Local dev** | `http://127.0.0.1:8000` |
-| **GCP (staging/prod)** | Provided by your platform team (e.g. `https://rag-api.example.com`) |
+| **Cloud Run (staging/prod)** | `https://….run.app` — HTTPS URL from your operator (no port) |
 
 All routes below are prefixed with **`/api/v1`**.
 
@@ -537,4 +537,4 @@ This service does **not** expose Redis or the database to clients — all data r
 
 - **OpenAPI / Swagger:** `{BASE_URL}/docs` — full request/response schemas and try-it-out UI.
 - **Embedding dimension rules:** `GET /api/v1/embeddings/dimension-constraints`
-- **Service operators:** see [ONBOARDING.md](./ONBOARDING.md) and [DEPLOY_GCP.md](./DEPLOY_GCP.md) in this repo.
+- **Service operators:** see [ONBOARDING.md](./ONBOARDING.md) and [DEPLOY_CLOUD_RUN.md](./DEPLOY_CLOUD_RUN.md) in this repo.

@@ -1,4 +1,4 @@
-# Production stack for a single VM (GCP e2-micro or similar).
+# Production stack for a single VM (legacy — prefer Cloud Run; see docs/DEPLOY_CLOUD_RUN.md).
 # Secrets live in .env on the server — see .env.example and docs/DEPLOY_GCP.md.
 services:
   postgres:

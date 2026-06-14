@@ -1,331 +1,41 @@
-# Deploy on GCP (budget VM) + GitHub Actions CI/CD
+# Deploy on GCP — legacy VM (deprecated)
 
-This guide deploys the full stack on **one small GCP VM** (~$0/month on the free-tier `e2-micro`) and uses **GitHub Actions** to test every PR and auto-deploy `main`.
+> **Use Cloud Run instead:** [DEPLOY_CLOUD_RUN.md](./DEPLOY_CLOUD_RUN.md)  
+> GitHub Actions now deploys to **Cloud Run**, not SSH to a VM.
 
-## Architecture
+---
 
-```
-GitHub (push/PR)
-    │
-    ├─ CI workflow ──► unit tests + Docker build
-    │
-    └─ Deploy workflow (stage branch) ──SSH──► GCP VM
-                                              ├─ postgres
-                                              ├─ redis
-                                              ├─ minio
-                                              ├─ api :8000
-                                              └─ worker
-```
+## Legacy VM deploy (deprecated)
 
-## Part 1 — Create the GCP VM (Console UI)
+The sections below describe the old **single VM + docker compose** setup. They are kept for reference if you still have a VM running.
 
-1. [Google Cloud Console](https://console.cloud.google.com) → create/select a project.
-2. **Billing** → set a **budget alert** (e.g. $5).
-3. **APIs & Services → Library** → enable **Compute Engine API**.
-4. **Compute Engine → VM instances → Create instance**
-   - Name: `rag-server`
-   - Region: `us-central1` (or `us-west1` / `us-east1` for Always Free `e2-micro`)
-   - Machine type: **e2-micro**
-   - Boot disk: Ubuntu 22.04 LTS, 20 GB
-   - Firewall: allow **HTTP** and **HTTPS**
-5. Create the VM and note the **External IP**.
+### What changed
 
-### Firewall for the API (port 8000)
+| Before (VM) | Now (Cloud Run) |
+|---------------|-----------------|
+| SSH deploy via `appleboy/ssh-action` | `gcloud run deploy` |
+| Postgres/Redis/MinIO on VM | Cloud SQL + Redis Cloud + GCS |
+| `http://VM_IP:8000` | `https://….run.app` |
+| Secrets in VM `.env` | GitHub Environment secrets |
+| Firewall port 8000 | Not needed (HTTPS by default) |
 
-**VPC network → Firewall → Create rule**
+### Shut down the old VM
 
-- Name: `allow-api-8000`
-- Targets: All instances in the network
-- Source: `0.0.0.0/0` (or your home IP for tighter security)
-- Protocol: `tcp:8000`
+1. GCP Console → **Compute Engine** → stop/delete the VM
+2. Remove GitHub secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`
+3. Follow [DEPLOY_CLOUD_RUN.md](./DEPLOY_CLOUD_RUN.md) for Cloud Run secrets
 
-API docs after deploy: `http://YOUR_VM_IP:8000/docs`
+---
 
-## Part 2 — Prepare the VM (browser SSH)
+<details>
+<summary>Original VM deploy guide (archived)</summary>
 
-On the VM list, click **SSH** next to your instance.
+See git history for the full VM + SSH + `docker-compose.prod.yml` documentation, or the archived content in commit before Cloud Run migration.
 
-```bash
-sudo apt-get update
-sudo apt-get install -y docker.io docker-compose-v2 git
-sudo usermod -aG docker "$USER"
-```
+Quick reference files (legacy only):
 
-Close SSH, open a **new** SSH session, then:
+- `docker-compose.prod.yml`
+- `docker-compose.debug.yml`
+- `scripts/deploy.sh`
 
-```bash
-git clone -b stage https://github.com/YOUR_ORG/rag-document-processor.git
-cd rag-document-processor
-
-cp .env.example .env
-nano .env
-```
-
-Deployments track the **`stage`** branch. Use `main` for stable code; merge into `stage` when you want the VM updated.
-
-Set at least (compose overrides DB/Redis/MinIO hostnames; secrets stay in `.env`):
-
-```env
-API_KEY_ADMIN_SECRET=long-random-string
-OPENAI_API_KEY=sk-...
-# JINA_API_KEY=...
-# LLAMA_CLOUD_API_KEY=...
-```
-
-After the stack is up, mint a client API key (shown once):
-
-```bash
-docker compose -f docker-compose.prod.yml exec api python scripts/create_api_key.py "first client"
-```
-
-Postgres, Redis, and MinIO are **not** installed on the VM separately — `docker-compose.prod.yml` starts them as containers when you deploy. You only need Docker and git on the host.
-
-**Ongoing deploys are done by GitHub Actions** (see Part 4). You do **not** need to run `./scripts/deploy.sh` manually after the one-time setup below — unless you are debugging.
-
-Optional first manual deploy (same steps as the Actions workflow):
-
-```bash
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
-```
-
-Create the MinIO bucket once (uploads). **GitHub Actions runs this automatically** on every deploy; run manually only if needed:
-
-```bash
-NETWORK=$(docker network ls --format '{{.Name}}' | grep rag-document-processor | head -1)
-docker run --rm --network "$NETWORK" minio/mc alias set local http://minio:9000 minioadmin minioadmin
-docker run --rm --network "$NETWORK" minio/mc mb local/rag-uploads --ignore-existing
-```
-
-## Part 3 — GitHub Actions secrets
-
-In your GitHub repo: **Settings → Secrets and variables → Actions**.
-
-Create an **Environment** named `staging` (**Settings → Environments → New**). Add secrets there (recommended) or at repo level. Deploys run from the **`stage`** branch into this environment.
-
-| Secret | Example | Description |
-|--------|---------|-------------|
-| `SSH_HOST` | `34.12.34.56` | VM external IP |
-| `SSH_USER` | `your_username` | Linux user on the VM (from browser SSH) |
-| `SSH_PRIVATE_KEY` | `-----BEGIN OPENSSH PRIVATE KEY-----...` | Private key for deploy (see below) |
-| `DEPLOY_PATH` | `/home/your_username/rag-document-processor` | Absolute path to the repo on the VM |
-
-Optional: `SSH_PORT` if not using 22.
-
-### Deploy SSH key (recommended)
-
-On your **local machine**:
-
-```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f github_deploy_key -N ""
-```
-
-On the **VM** (append the public key):
-
-```bash
-mkdir -p ~/.ssh
-chmod 700 ~/.ssh
-echo "PASTE_CONTENTS_OF_github_deploy_key.pub" >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-```
-
-In **GitHub**, set `SSH_PRIVATE_KEY` to the full contents of `github_deploy_key` (private file).
-
-### Private GitHub repo on the VM
-
-Use a **deploy key** so `git fetch` on the VM works:
-
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N ""
-cat ~/.ssh/github_deploy.pub   # add as Deploy key in GitHub repo settings (read-only)
-git clone -b stage git@github.com:YOUR_ORG/rag-document-processor.git
-```
-
-## Part 4 — How CI/CD works
-
-### Branches
-
-| Branch | Role |
-|--------|------|
-| `main` | Default branch; CI runs on push/PR. Workflow definitions live here. |
-| `stage` | **Deploy branch** — pushes here deploy to the GCP VM after CI passes. |
-
-### CI (`.github/workflows/ci.yml`)
-
-Runs on every **push** and **pull request** to `main` or `stage`:
-
-1. `uv sync --extra dev`
-2. `uv run pytest tests/unit -q`
-3. `docker build` (ensures the production image builds)
-
-### Deploy (`.github/workflows/deploy.yml`)
-
-Runs when:
-
-- CI **succeeds** on a push to **`stage`**, or
-- You click **Run workflow** manually (`workflow_dispatch`)
-
-Steps over SSH:
-
-```bash
-cd $DEPLOY_PATH
-git fetch origin stage && git checkout stage && git reset --hard origin/stage
-docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
-```
-
-Watch runs under **Actions** in GitHub.
-
-### Deploy with GitHub Actions (recommended)
-
-After the one-time VM + secrets setup (Parts 1–3), **every deploy goes through GitHub** — no manual SSH deploy required.
-
-#### One-time checklist (VM)
-
-1. VM has Docker, git, and the repo cloned at `DEPLOY_PATH`
-2. `.env` exists on the VM with `API_KEY_ADMIN_SECRET`, `OPENAI_API_KEY`, etc.
-3. GitHub **Environment** `staging` has secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`
-4. Deploy SSH public key is in the VM `~/.ssh/authorized_keys`
-5. VM can `git fetch` from GitHub (HTTPS or deploy key)
-
-#### Trigger a deploy
-
-**Option A — Push to `stage` (automatic)**
-
-```bash
-git checkout stage
-git merge main          # or commit your changes on stage
-git push origin stage
-```
-
-1. **CI** workflow runs (tests + Docker build)
-2. When CI **succeeds**, **Deploy** workflow SSHs to the VM and runs `scripts/deploy.sh`
-
-**Option B — Manual run (no new commit)**
-
-1. Open GitHub → **Actions** → **Deploy**
-2. Click **Run workflow**
-3. Choose branch **`stage`** → **Run workflow**
-
-Use this after fixing secrets, redeploying the same commit, or recovering from a failed deploy.
-
-#### What the Deploy workflow does on the VM
-
-```bash
-cd $DEPLOY_PATH
-./scripts/deploy.sh                    # git pull stage + docker compose up --build
-# ensure MinIO bucket rag-uploads exists
-curl http://localhost:8000/api/v1/health   # fail the job if API is down
-```
-
-#### After the first successful deploy
-
-Mint a client API key **once** on the VM (not automated — secret shown only once):
-
-```bash
-docker compose -f docker-compose.prod.yml exec api python scripts/create_api_key.py "production client"
-```
-
-Verify from your laptop: `http://YOUR_VM_IP:8000/docs`
-
-#### Clean redeploy (wipe DB + uploads)
-
-GitHub Actions does **not** remove Docker volumes. To reset data, SSH to the VM **once**:
-
-```bash
-cd $DEPLOY_PATH
-docker compose -f docker-compose.prod.yml down -v
-```
-
-Then trigger **Deploy** again from GitHub Actions (Run workflow or push to `stage`).
-
-## Part 5 — Day-to-day workflow
-
-1. Develop on a branch → open PR into `stage` (or `main`) → **CI** runs tests.
-2. Merge to **`stage`** → **CI** → **Deploy** (GitHub Actions) updates the GCP VM.
-3. Check `http://YOUR_VM_IP:8000/docs`.
-
-If the VM was cloned from `main`, switch it once:
-
-```bash
-cd ~/rag-document-processor
-git fetch origin stage
-git checkout stage
-```
-
-Manual deploy on the VM:
-
-```bash
-cd ~/rag-document-processor
-./scripts/deploy.sh
-```
-
-## Part 6 — Access Postgres, Redis, and MinIO from your laptop
-
-Production compose keeps Postgres and Redis **internal** (not on the public internet). To browse them with DBeaver, Redis Insight, or the MinIO console, use the optional debug override plus an SSH tunnel.
-
-### On the VM (enable localhost ports)
-
-```bash
-cd ~/rag-document-processor
-docker compose -f docker-compose.prod.yml -f docker-compose.debug.yml up -d
-```
-
-`docker-compose.debug.yml` binds services to `127.0.0.1` on the VM only — still not reachable from the internet.
-
-### On your laptop (SSH tunnel)
-
-Windows PowerShell or terminal:
-
-```bash
-ssh -L 5432:localhost:5432 -L 6379:localhost:6379 -L 9001:localhost:9001 USER@VM_IP
-```
-
-Or with gcloud:
-
-```bash
-gcloud compute ssh rag-server --zone=YOUR_ZONE -- -L 5432:localhost:5432 -L 6379:localhost:6379 -L 9001:localhost:9001
-```
-
-Keep that session open, then connect GUI tools to **localhost**:
-
-| Service | Host | Port | Credentials |
-|---------|------|------|-------------|
-| Postgres | `localhost` | `5432` | user `rag`, password `rag`, database `rag` |
-| Redis | `localhost` | `6379` | no password |
-| MinIO console | `http://localhost:9001` | | `minioadmin` / `minioadmin`, bucket `rag-uploads` |
-
-**Security:** never open ports `5432` or `6379` in the GCP firewall. SSH tunnel only.
-
-### CLI on the VM (no tunnel)
-
-```bash
-docker compose -f docker-compose.prod.yml exec postgres psql -U rag -d rag
-docker compose -f docker-compose.prod.yml exec redis redis-cli
-```
-
-## Cost tips
-
-- Use **e2-micro** in a free-tier region.
-- **Stop** the VM when not testing (**Compute Engine → Stop**).
-- Set billing budget alerts.
-- Avoid Cloud SQL + Memorystore until you need managed services.
-
-## Troubleshooting
-
-| Issue | Check |
-|-------|--------|
-| Deploy fails SSH | `SSH_HOST`, `SSH_USER`, key in `authorized_keys`, firewall allows port 22 |
-| Deploy `Run Command Timeout` | First deploy on e2-micro can take 15–30+ min (Docker build). Workflow uses `command_timeout: 60m`; or SSH to VM and run `./scripts/deploy.sh` once, then re-run Actions |
-| API up, jobs pending | `docker compose -f docker-compose.prod.yml logs worker` |
-| DB errors | `docker compose -f docker-compose.prod.yml logs api` (migrations on startup) |
-| Upload errors | MinIO bucket `rag-uploads` exists |
-
-## Files added for deployment
-
-| File | Purpose |
-|------|---------|
-| `docker-compose.prod.yml` | Full production stack on one VM |
-| `docker-compose.debug.yml` | Optional localhost ports for SSH-tunnel access from your laptop |
-| `.github/workflows/ci.yml` | Tests + Docker build |
-| `.github/workflows/deploy.yml` | SSH deploy after CI |
-| `scripts/deploy.sh` | Manual deploy helper on the VM |
+</details>

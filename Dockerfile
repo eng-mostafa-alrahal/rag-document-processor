@@ -12,4 +12,5 @@ RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -e .
 
 EXPOSE 8000
-CMD ["uvicorn", "rag_document_processor.main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "src"]
+# Cloud Run sets PORT (default 8080); local/docker-compose uses 8000.
+CMD ["sh", "-c", "exec uvicorn rag_document_processor.main:app --host 0.0.0.0 --port ${PORT:-8000} --app-dir src"]

@@ -130,6 +130,10 @@ Add **unit** tests next to the module you change; use **integration** when real 
 | New HTTP route | `presentation/api/v1/`, `router.py`, `deps.py` |
 | Celery behavior | `workers/tasks.py`, `process_job.py` |
 
+## Deploy / production
+
+Production runs on **Google Cloud Run** — see [DEPLOY_CLOUD_RUN.md](./DEPLOY_CLOUD_RUN.md). CI deploys on push to `stage`.
+
 ## Questions
 
 Prefer **Slack / issue / PR comment** per your team norm. For code intent, **git blame** and **tests** are the other source of truth.

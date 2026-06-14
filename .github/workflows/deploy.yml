@@ -11,6 +11,14 @@ concurrency:
   group: deploy-staging
   cancel-in-progress: false
 
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  ARTIFACT_REGISTRY: rag
+  CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+  API_SERVICE: rag-api
+  WORKER_SERVICE: rag-worker
+
 jobs:
   deploy:
     if: >
@@ -19,31 +27,114 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 60m
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd "${{ secrets.DEPLOY_PATH }}"
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
 
-            if [[ ! -f .env ]]; then
-              echo "ERROR: .env is missing on the VM." >&2
-              echo "One-time setup: cp .env.example .env && nano .env (see docs/DEPLOY_GCP.md)" >&2
-              exit 1
-            fi
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-            chmod +x scripts/deploy.sh
-            ./scripts/deploy.sh
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-            NETWORK=$(docker network ls --format '{{.Name}}' | grep rag-document-processor | head -1)
-            docker run --rm --network "$NETWORK" minio/mc alias set local http://minio:9000 minioadmin minioadmin
-            docker run --rm --network "$NETWORK" minio/mc mb local/rag-uploads --ignore-existing
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
 
-            docker compose -f docker-compose.prod.yml ps
-            curl -sf http://localhost:8000/api/v1/health
-            echo "Deploy OK — health check passed"
+      - name: Build and push image
+        env:
+          IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY }}/rag-document-processor:${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Write Cloud Run env file
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+          CELERY_RESULT_BACKEND: ${{ secrets.CELERY_RESULT_BACKEND }}
+          API_KEY_ADMIN_SECRET: ${{ secrets.API_KEY_ADMIN_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+          LLAMA_CLOUD_API_KEY: ${{ secrets.LLAMA_CLOUD_API_KEY }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL }}
+        run: |
+          cat > /tmp/cloudrun-env.yaml <<EOF
+          ENV: production
+          DATABASE_AUTO_MIGRATE: "true"
+          DATABASE_AUTO_CREATE: "false"
+          STORAGE_BACKEND: s3
+          S3_REGION: auto
+          REDIS_STREAM_DB: "0"
+          DATABASE_URL: "${DATABASE_URL}"
+          DATABASE_URL_SYNC: "${DATABASE_URL_SYNC}"
+          REDIS_URL: "${REDIS_URL}"
+          CELERY_BROKER_URL: "${CELERY_BROKER_URL}"
+          CELERY_RESULT_BACKEND: "${CELERY_RESULT_BACKEND}"
+          API_KEY_ADMIN_SECRET: "${API_KEY_ADMIN_SECRET}"
+          OPENAI_API_KEY: "${OPENAI_API_KEY}"
+          JINA_API_KEY: "${JINA_API_KEY}"
+          LLAMA_CLOUD_API_KEY: "${LLAMA_CLOUD_API_KEY}"
+          S3_BUCKET_NAME: "${S3_BUCKET_NAME}"
+          S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID}"
+          S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY}"
+          S3_ENDPOINT_URL: "${S3_ENDPOINT_URL}"
+          EOF
+
+      - name: Deploy API to Cloud Run
+        run: |
+          gcloud run deploy "${{ env.API_SERVICE }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --platform managed \
+            --image "$IMAGE" \
+            --port 8000 \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
+            --timeout 300 \
+            --min-instances 0 \
+            --max-instances 3 \
+            --add-cloudsql-instances "${{ env.CLOUD_SQL_CONNECTION_NAME }}" \
+            --env-vars-file /tmp/cloudrun-env.yaml \
+            --quiet
+
+      - name: Deploy Celery worker to Cloud Run
+        run: |
+          gcloud run deploy "${{ env.WORKER_SERVICE }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --platform managed \
+            --image "$IMAGE" \
+            --command celery \
+            --args=-A,rag_document_processor.workers.celery_app,worker,-l,info,--concurrency=1 \
+            --no-allow-unauthenticated \
+            --ingress internal \
+            --no-cpu-throttling \
+            --memory 2Gi \
+            --cpu 1 \
+            --timeout 3600 \
+            --min-instances 1 \
+            --max-instances 1 \
+            --add-cloudsql-instances "${{ env.CLOUD_SQL_CONNECTION_NAME }}" \
+            --env-vars-file /tmp/cloudrun-env.yaml \
+            --quiet
+
+      - name: Print API URL
+        run: |
+          URL=$(gcloud run services describe "${{ env.API_SERVICE }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --format 'value(status.url)')
+          echo "API URL: ${URL}"
+          echo "Docs:    ${URL}/docs"
+          curl -sf "${URL}/api/v1/health"
+          echo "Health check passed"

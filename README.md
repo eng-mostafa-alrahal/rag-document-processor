@@ -6,7 +6,8 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 
 - **[docs/API_INTEGRATION.md](docs/API_INTEGRATION.md)** — **for other teams / projects**: authentication, ingest flow, polling, fetching results, code examples (Python, JS, curl).
 - **[docs/ONBOARDING.md](docs/ONBOARDING.md)** — onboarding for new developers: architecture, local setup, ingest flow, tests, migrations, pitfalls, and **Cursor** tips (`@`-mentions).
-- **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** — budget GCP VM deploy + **GitHub Actions** CI/CD.
+- **[docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md)** — **production deploy**: Cloud Run + Cloud SQL + GitHub Actions.
+- **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** — legacy VM deploy (deprecated).
 - **[AGENTS.md](AGENTS.md)** — short project map for **AI agents** (Cursor); keep this file updated when the high-level layout or commands change.
 
 ## Quick start
@@ -65,4 +66,4 @@ uv run pytest tests/integration -m integration -q   # requires Docker
 
 ## CI/CD
 
-GitHub Actions runs unit tests and a Docker build on every push/PR to `main` or `stage` (`.github/workflows/ci.yml`). Pushes to **`stage`** deploy to a GCP VM over SSH (`.github/workflows/deploy.yml`). See **[docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md)** for VM setup and GitHub secrets.
+GitHub Actions runs unit tests and a Docker build on every push/PR to `main` or `stage` (`.github/workflows/ci.yml`). Pushes to **`stage`** deploy to **Google Cloud Run** (`.github/workflows/deploy.yml`). See **[docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md)** for GCP setup and GitHub secrets.
