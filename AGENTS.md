@@ -51,7 +51,7 @@ Prefer unit tests under `tests/unit/`; integration tests may need Docker (`tests
 ## Deploy / CI
 
 - **CI:** `.github/workflows/ci.yml` — unit tests + Docker build on push/PR.
-- **CD:** `.github/workflows/deploy.yml` — on push to **`stage`**, deploy **API + worker** to **Google Cloud Run**.
+- **CI/CD:** `.github/workflows/ci.yml` — tests + Docker build on push/PR; **deploy to Cloud Run only on `stage`** (never `main`).
 - **Docs:** `docs/DEPLOY_CLOUD_RUN.md` (primary), `docs/DEPLOY_GCP.md` (legacy VM), `docker-compose.prod.yml` (local/legacy VM stack).
 
 ## When unsure
