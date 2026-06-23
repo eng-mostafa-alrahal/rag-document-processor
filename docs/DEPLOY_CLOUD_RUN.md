@@ -39,16 +39,14 @@ API_KEY_ADMIN_SECRET = (long random string for admin API key management)
 ## Architecture (what we are building)
 
 ```text
-GitHub push to stage
-       │
-       └─ CI workflow
-              ├─ test + docker build jobs
-              └─ deploy job (Cloud Run) — only on stage branch
-                     ├─ rag-api (public HTTPS)
-                     ├─ rag-worker (Celery)
-                     ├─ Cloud SQL / Redis / GCS
+Push to stage
+   ├─ CI workflow      → tests + docker build
+   └─ Deploy workflow  → Cloud Run (stage only)
+                            ├─ rag-api (public HTTPS)
+                            ├─ rag-worker (Celery)
+                            └─ Cloud SQL / Redis / GCS
 
-Pushes to main: test + docker only (deploy job skipped)
+Push to main → CI only (no deploy)
 ```
 
 ---
@@ -345,20 +343,20 @@ If you already pushed, trigger deploy manually (Step 11).
 **Option A — Push to `stage` (automatic):**
 
 1. Push any commit to `stage`.
-2. Open **Actions → CI** — the **`deploy`** job runs after tests and Docker build pass.
-3. Pushes to **`main`** run tests only — **no deploy**.
+2. Open **Actions → Deploy** — it runs the Cloud Run deploy.
+3. Pushes to **`main`** never trigger Deploy.
 
 **Option B — Manual (no new commit):**
 
-1. GitHub → **Actions** → **CI**.
+1. GitHub → **Actions** → **Deploy**.
 2. **Run workflow** → branch **`stage`** → **Run workflow**.
-3. Wait for **`deploy`** job (skipped if you pick `main`).
+3. (The manual button only appears once `deploy.yml` is on the default branch — see Step 10.)
 
 ---
 
 ### Step 12 — Watch the deploy log
 
-Open the running **CI** workflow → **`deploy`** job. It should:
+Open the running **Deploy** workflow. It should:
 
 1. Authenticate to GCP
 2. Build and push Docker image to Artifact Registry
@@ -479,10 +477,10 @@ git merge main          # or commit directly on stage
 git push origin stage
 ```
 
-1. **CI** runs on push to `stage`; **`deploy`** job runs after tests pass (skipped on `main`).
-2. Check the **`deploy`** job log for `Health check passed`.
+1. Push to `stage` triggers **CI** (tests) and **Deploy** (Cloud Run). Pushing to `main` runs CI only.
+2. Check the **Deploy** workflow log for `Health check passed`.
 
-Manual redeploy without a new commit: **Actions → CI → Run workflow** (branch **`stage`**).
+Manual redeploy without a new commit: **Actions → Deploy → Run workflow** (branch **`stage`**).
 
 ---
 
@@ -516,7 +514,8 @@ Manual redeploy without a new commit: **Actions → CI → Run workflow** (branc
 
 | Symptom | What to check |
 |---------|---------------|
-| Deploy uses **appleboy/ssh-action** / `missing server host` | Old separate **Deploy** workflow — removed. Use **CI** workflow; deploy runs only when `github.ref == stage`. |
+| Deploy uses **appleboy/ssh-action** / `missing server host` | Stale SSH `deploy.yml` on `main`. Merge `stage` into `main` so the default branch has the Cloud Run `deploy.yml`. |
+| Manual **Run workflow** missing / `Workflow does not exist...` | `deploy.yml` must be on the **default branch** (`main`) for the manual button to appear. Merge `stage` → `main`. |
 | Deploy fails at **Authenticate to Google Cloud** | `GCP_SA_KEY` is valid JSON (entire file pasted, including `{` and `}`) |
 | Deploy fails at **docker push** | Service account has `roles/artifactregistry.writer`; Artifact Registry repo `rag` exists in `GCP_REGION` |
 | Deploy fails at **gcloud run deploy** | `CLOUD_SQL_CONNECTION_NAME` correct; SA has `roles/run.admin` and `roles/cloudsql.client` |

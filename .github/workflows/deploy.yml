@@ -1,0 +1,140 @@
+name: Deploy
+
+# Deploy to Cloud Run ONLY on push to the stage branch.
+# Push events use the workflow file from the pushed ref (stage), so this always
+# runs the correct definition. Pushing to main never triggers a deploy.
+# workflow_dispatch lets you redeploy manually (must select the stage branch).
+on:
+  push:
+    branches: [stage]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  ARTIFACT_REGISTRY: rag
+  CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+  API_SERVICE: rag-api
+  WORKER_SERVICE: rag-worker
+
+jobs:
+  deploy:
+    # Extra guard: never deploy from any branch other than stage.
+    if: github.ref == 'refs/heads/stage'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ env.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build and push image
+        env:
+          IMAGE: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY }}/rag-document-processor:${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Write Cloud Run env file
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+          CELERY_RESULT_BACKEND: ${{ secrets.CELERY_RESULT_BACKEND }}
+          API_KEY_ADMIN_SECRET: ${{ secrets.API_KEY_ADMIN_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+          LLAMA_CLOUD_API_KEY: ${{ secrets.LLAMA_CLOUD_API_KEY }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL }}
+        run: |
+          cat > /tmp/cloudrun-env.yaml <<EOF
+          ENV: production
+          DATABASE_AUTO_MIGRATE: "true"
+          DATABASE_AUTO_CREATE: "false"
+          STORAGE_BACKEND: s3
+          S3_REGION: auto
+          REDIS_STREAM_DB: "0"
+          DATABASE_URL: "${DATABASE_URL}"
+          DATABASE_URL_SYNC: "${DATABASE_URL_SYNC}"
+          REDIS_URL: "${REDIS_URL}"
+          CELERY_BROKER_URL: "${CELERY_BROKER_URL}"
+          CELERY_RESULT_BACKEND: "${CELERY_RESULT_BACKEND}"
+          API_KEY_ADMIN_SECRET: "${API_KEY_ADMIN_SECRET}"
+          OPENAI_API_KEY: "${OPENAI_API_KEY}"
+          JINA_API_KEY: "${JINA_API_KEY}"
+          LLAMA_CLOUD_API_KEY: "${LLAMA_CLOUD_API_KEY}"
+          S3_BUCKET_NAME: "${S3_BUCKET_NAME}"
+          S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID}"
+          S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY}"
+          S3_ENDPOINT_URL: "${S3_ENDPOINT_URL}"
+          EOF
+
+      - name: Deploy API to Cloud Run
+        run: |
+          gcloud run deploy "${{ env.API_SERVICE }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --platform managed \
+            --image "$IMAGE" \
+            --port 8000 \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
+            --timeout 300 \
+            --min-instances 0 \
+            --max-instances 3 \
+            --add-cloudsql-instances "${{ env.CLOUD_SQL_CONNECTION_NAME }}" \
+            --env-vars-file /tmp/cloudrun-env.yaml \
+            --quiet
+
+      - name: Deploy Celery worker to Cloud Run
+        run: |
+          gcloud run deploy "${{ env.WORKER_SERVICE }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --platform managed \
+            --image "$IMAGE" \
+            --port 8080 \
+            --command sh \
+            --args=scripts/cloudrun_celery_worker.sh \
+            --no-allow-unauthenticated \
+            --ingress internal \
+            --no-cpu-throttling \
+            --memory 2Gi \
+            --cpu 1 \
+            --timeout 3600 \
+            --min-instances 1 \
+            --max-instances 1 \
+            --add-cloudsql-instances "${{ env.CLOUD_SQL_CONNECTION_NAME }}" \
+            --env-vars-file /tmp/cloudrun-env.yaml \
+            --quiet
+
+      - name: Print API URL
+        run: |
+          URL=$(gcloud run services describe "${{ env.API_SERVICE }}" \
+            --project "${{ env.GCP_PROJECT_ID }}" \
+            --region "${{ env.GCP_REGION }}" \
+            --format 'value(status.url)')
+          echo "API URL: ${URL}"
+          echo "Docs:    ${URL}/docs"
+          curl -sf "${URL}/api/v1/health"
+          echo "Health check passed"
