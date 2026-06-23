@@ -9,7 +9,9 @@ COPY alembic ./alembic
 COPY src ./src
 COPY scripts ./scripts
 RUN pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir -e .
+    && pip install --no-cache-dir -e . \
+    && sed -i 's/\r$//' scripts/*.sh \
+    && chmod +x scripts/cloudrun_celery_worker.sh
 
 EXPOSE 8000
 # Cloud Run sets PORT (default 8080); local/docker-compose uses 8000.

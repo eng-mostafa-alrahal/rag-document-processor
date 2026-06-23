@@ -2,7 +2,7 @@
 # Cloud Run requires a process listening on $PORT for startup/liveness probes.
 # Celery does not serve HTTP, so we run the worker in the background and a
 # tiny health server in the foreground.
-set -eu
+set -e
 
 PORT="${PORT:-8080}"
 
