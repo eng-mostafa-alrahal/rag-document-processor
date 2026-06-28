@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 
 from rag_document_processor.application.use_cases.api_keys.manage import (
@@ -30,13 +30,15 @@ def get_container(request: Request) -> Container:
 
 ContainerDep = Annotated[Container, Depends(get_container)]
 
-_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-_admin_secret_header = APIKeyHeader(name="X-Admin-Secret", auto_error=False)
+_api_key_header = APIKeyHeader(name="X-API-Key", scheme_name="X-API-Key", auto_error=False)
+_admin_secret_header = APIKeyHeader(
+    name="X-Admin-Secret", scheme_name="X-Admin-Secret", auto_error=False
+)
 
 
 async def require_api_key(
     request: Request,
-    api_key: Annotated[str | None, Depends(_api_key_header)],
+    api_key: Annotated[str | None, Security(_api_key_header)],
 ) -> ApiKey:
     if not api_key or not api_key.strip():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
@@ -57,7 +59,7 @@ ApiKeyDep = Annotated[ApiKey, Depends(require_api_key)]
 
 async def require_admin(
     request: Request,
-    admin_secret: Annotated[str | None, Depends(_admin_secret_header)],
+    admin_secret: Annotated[str | None, Security(_admin_secret_header)],
 ) -> None:
     configured = get_container(request).settings.api_key_admin_secret
     if not configured or not admin_secret or not secrets.compare_digest(admin_secret, configured):
