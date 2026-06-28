@@ -17,7 +17,6 @@ env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   GCP_REGION: ${{ secrets.GCP_REGION }}
   ARTIFACT_REGISTRY: rag
-  CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
   API_SERVICE: rag-api
   WORKER_SERVICE: rag-worker
 
@@ -50,8 +49,9 @@ jobs:
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
-      - name: Write Cloud Run env file
+      - name: Normalize secrets (trim whitespace)
         env:
+          CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_SYNC: ${{ secrets.DATABASE_URL_SYNC }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
@@ -65,6 +65,26 @@ jobs:
           S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
           S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL }}
+        run: |
+          trim() { printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+          {
+            echo "CLOUD_SQL_CONNECTION_NAME=$(trim "$CLOUD_SQL_CONNECTION_NAME")"
+            echo "DATABASE_URL=$(trim "$DATABASE_URL")"
+            echo "DATABASE_URL_SYNC=$(trim "$DATABASE_URL_SYNC")"
+            echo "REDIS_URL=$(trim "$REDIS_URL")"
+            echo "CELERY_BROKER_URL=$(trim "$CELERY_BROKER_URL")"
+            echo "CELERY_RESULT_BACKEND=$(trim "$CELERY_RESULT_BACKEND")"
+            echo "API_KEY_ADMIN_SECRET=$(trim "$API_KEY_ADMIN_SECRET")"
+            echo "OPENAI_API_KEY=$(trim "$OPENAI_API_KEY")"
+            echo "JINA_API_KEY=$(trim "$JINA_API_KEY")"
+            echo "LLAMA_CLOUD_API_KEY=$(trim "$LLAMA_CLOUD_API_KEY")"
+            echo "S3_BUCKET_NAME=$(trim "$S3_BUCKET_NAME")"
+            echo "S3_ACCESS_KEY_ID=$(trim "$S3_ACCESS_KEY_ID")"
+            echo "S3_SECRET_ACCESS_KEY=$(trim "$S3_SECRET_ACCESS_KEY")"
+            echo "S3_ENDPOINT_URL=$(trim "$S3_ENDPOINT_URL")"
+          } >> "$GITHUB_ENV"
+
+      - name: Write Cloud Run env file
         run: |
           cat > /tmp/cloudrun-env.yaml <<EOF
           ENV: production
