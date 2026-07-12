@@ -13,6 +13,8 @@ from rag_document_processor.presentation.schemas.ingestion import (
     FORM_DESC_EMBEDDING_MODEL,
     FORM_DESC_EMBEDDING_PIPELINE,
     FORM_DESC_EMBEDDER_PROVIDER,
+    FORM_DESC_LATE_CHUNK_MAX_TOKENS,
+    FORM_DESC_LATE_CHUNK_MIN_TOKENS,
     FORM_DESC_LLAMA_PARSE_TIER,
     FORM_DESC_MACRO_SPLITTER,
     JobCreatedResponse,
@@ -33,6 +35,8 @@ async def ingest_file(
     macro_splitter: str | None = Form(default=None, description=FORM_DESC_MACRO_SPLITTER),
     embedder_provider: str | None = Form(default=None, description=FORM_DESC_EMBEDDER_PROVIDER),
     embedding_model: str | None = Form(default=None, description=FORM_DESC_EMBEDDING_MODEL),
+    late_chunk_min_tokens: int | None = Form(default=None, description=FORM_DESC_LATE_CHUNK_MIN_TOKENS),
+    late_chunk_max_tokens: int | None = Form(default=None, description=FORM_DESC_LATE_CHUNK_MAX_TOKENS),
     uc=Depends(submit_file_use_case),
 ) -> JobCreatedResponse:
     """Enqueue a document from a multipart upload.
@@ -50,6 +54,8 @@ async def ingest_file(
         macro_splitter=macro_splitter,
         embedder_provider=embedder_provider,
         embedding_model=embedding_model,
+        late_chunk_min_tokens=late_chunk_min_tokens,
+        late_chunk_max_tokens=late_chunk_max_tokens,
     )
     return JobCreatedResponse(job_id=dto.job_id)
 
@@ -69,6 +75,8 @@ async def ingest_url(
         macro_splitter=body.macro_splitter,
         embedder_provider=body.embedder_provider,
         embedding_model=body.embedding_model,
+        late_chunk_min_tokens=body.late_chunk_min_tokens,
+        late_chunk_max_tokens=body.late_chunk_max_tokens,
     )
     return JobCreatedResponse(job_id=dto.job_id)
 
@@ -88,5 +96,7 @@ async def ingest_text(
         macro_splitter=body.macro_splitter,
         embedder_provider=body.embedder_provider,
         embedding_model=body.embedding_model,
+        late_chunk_min_tokens=body.late_chunk_min_tokens,
+        late_chunk_max_tokens=body.late_chunk_max_tokens,
     )
     return JobCreatedResponse(job_id=dto.job_id)

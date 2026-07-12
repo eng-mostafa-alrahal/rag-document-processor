@@ -48,6 +48,14 @@ _EMBEDDING_DIM_DESC = (
     "Request bodies accept 1-16384 here; the API returns 422 with active_embedder, embedding_model, "
     "requested_dimensions, and allowed_dimensions_min/max when the value does not match the model."
 )
+_LATE_CHUNK_MIN_DESC = (
+    "late_chunking only: minimum tokens before a merged chunk may be finalized. Higher values mean fewer, "
+    "denser chunks (better RAG). Omit to use LATE_CHUNK_MIN_TOKENS from env. Must be <= late_chunk_max_tokens."
+)
+_LATE_CHUNK_MAX_DESC = (
+    "late_chunking only: maximum tokens per merged chunk. Omit to use LATE_CHUNK_MAX_TOKENS from env. "
+    "Ignored for chunk_then_embed."
+)
 
 # Shared OpenAPI hints for multipart /file (keep in sync with JSON body fields above).
 FORM_DESC_LLAMA_PARSE_TIER = (
@@ -59,6 +67,8 @@ FORM_DESC_EMBEDDING_PIPELINE = _EMBED_PIPE_DESC
 FORM_DESC_MACRO_SPLITTER = _MACRO_DESC
 FORM_DESC_EMBEDDER_PROVIDER = _PROVIDER_DESC
 FORM_DESC_EMBEDDING_MODEL = _EMBEDDING_MODEL_DESC
+FORM_DESC_LATE_CHUNK_MIN_TOKENS = _LATE_CHUNK_MIN_DESC
+FORM_DESC_LATE_CHUNK_MAX_TOKENS = _LATE_CHUNK_MAX_DESC
 
 _JOB_STATUS_VALUES = ", ".join(sorted(s.value for s in JobStatus))
 _SOURCE_KIND_VALUES = ", ".join(sorted(s.value for s in SourceKind))
@@ -104,6 +114,20 @@ class UrlIngestRequest(BaseModel):
         max_length=128,
         description=_EMBEDDING_MODEL_DESC,
         examples=["jina-embeddings-v3"],
+    )
+    late_chunk_min_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=8192,
+        description=_LATE_CHUNK_MIN_DESC,
+        examples=[256],
+    )
+    late_chunk_max_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=8192,
+        description=_LATE_CHUNK_MAX_DESC,
+        examples=[512],
     )
 
     @field_validator("llama_parse_tier")
@@ -164,6 +188,20 @@ class TextIngestRequest(BaseModel):
         max_length=128,
         description=_EMBEDDING_MODEL_DESC,
         examples=["jina-embeddings-v3"],
+    )
+    late_chunk_min_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=8192,
+        description=_LATE_CHUNK_MIN_DESC,
+        examples=[256],
+    )
+    late_chunk_max_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=8192,
+        description=_LATE_CHUNK_MAX_DESC,
+        examples=[512],
     )
 
     @field_validator("llama_parse_tier")
@@ -226,6 +264,12 @@ class JobStatusResponse(BaseModel):
     )
     embedding_model: str = Field(
         description="Effective embedding model id for the active provider (after overrides and env defaults).",
+    )
+    late_chunk_min_tokens: int = Field(
+        description="Effective minimum tokens per merged chunk for late_chunking (stored override or env default).",
+    )
+    late_chunk_max_tokens: int = Field(
+        description="Effective maximum tokens per merged chunk for late_chunking (stored override or env default).",
     )
     created_at: str = Field(description="ISO 8601 timestamp when the job was created.")
     updated_at: str = Field(description="ISO 8601 timestamp of the last status update.")

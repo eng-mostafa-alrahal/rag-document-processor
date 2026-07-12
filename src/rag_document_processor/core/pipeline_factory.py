@@ -8,6 +8,7 @@ from rag_document_processor.core.ingest_embedding_options import MacroKind, Reso
 from rag_document_processor.infrastructure.embedders.jina_embedder import JinaEmbedder
 from rag_document_processor.infrastructure.embedders.openai_embedder import OpenAIEmbedder
 from rag_document_processor.infrastructure.pipelines.embedding_pipelines import ChunkThenEmbedPipeline, LateChunkingPipeline
+from rag_document_processor.infrastructure.pipelines.late_chunk_enhancer import make_token_counter
 from rag_document_processor.infrastructure.splitters.macro_splitters import (
     RecursiveMacroSplitter,
     SemanticMacroSplitter,
@@ -38,7 +39,14 @@ def build_embedding_pipeline(
             model=resolved.jina_embedding_model,
             client=httpx_client,
         )
-        return LateChunkingPipeline(macro_splitter=macro, embedder=embedder)
+        return LateChunkingPipeline(
+            macro_splitter=macro,
+            embedder=embedder,
+            min_tokens=resolved.late_chunk_min_tokens,
+            max_tokens=resolved.late_chunk_max_tokens,
+            batch_tokens=resolved.late_chunk_batch_tokens,
+            count_tokens=make_token_counter(),
+        )
     chunker = RecursiveSentenceChunker()
     if resolved.embedder == "openai":
         embedder = OpenAIEmbedder(

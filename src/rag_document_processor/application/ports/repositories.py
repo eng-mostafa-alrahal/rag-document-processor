@@ -38,6 +38,8 @@ class IJobRepository(Protocol):
         embedder_provider: str | None = None,
         openai_embedding_model: str | None = None,
         jina_embedding_model: str | None = None,
+        late_chunk_min_tokens: int | None = None,
+        late_chunk_max_tokens: int | None = None,
     ) -> IngestionJob: ...
 
     async def get_by_id(self, job_id: UUID) -> IngestionJob | None: ...

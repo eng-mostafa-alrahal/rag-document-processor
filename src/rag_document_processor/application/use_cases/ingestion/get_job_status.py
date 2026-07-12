@@ -31,6 +31,8 @@ class GetJobStatusUseCase:
             job_embedder_provider=job.embedder_provider,
             job_openai_embedding_model=job.openai_embedding_model,
             job_jina_embedding_model=job.jina_embedding_model,
+            job_late_chunk_min_tokens=job.late_chunk_min_tokens,
+            job_late_chunk_max_tokens=job.late_chunk_max_tokens,
         )
         effective_tier = job.llama_parse_tier or self._settings.llama_parse_tier
         effective_dims = coalesce_embedding_dimensions(job.embedding_dimensions, self._settings.embedding_dimensions)
@@ -49,6 +51,8 @@ class GetJobStatusUseCase:
             macro_splitter=resolved.macro_splitter,
             embedder_provider=resolved.embedder,
             embedding_model=embedding_model,
+            late_chunk_min_tokens=resolved.late_chunk_min_tokens,
+            late_chunk_max_tokens=resolved.late_chunk_max_tokens,
             created_at=job.created_at.isoformat(),
             updated_at=job.updated_at.isoformat(),
         )

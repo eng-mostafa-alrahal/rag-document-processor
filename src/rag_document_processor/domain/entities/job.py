@@ -39,6 +39,9 @@ class IngestionJob:
     embedder_provider: str | None
     openai_embedding_model: str | None
     jina_embedding_model: str | None
+    # None => worker uses Settings.late_chunk_* (env defaults). Late-chunking only.
+    late_chunk_min_tokens: int | None
+    late_chunk_max_tokens: int | None
     error_message: str | None
     chunks_emitted: int
     created_at: datetime

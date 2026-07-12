@@ -14,6 +14,7 @@ from rag_document_processor.core.ingest_embedding_options import (
     coerce_embedder_provider,
     coerce_embedding_model,
     coerce_embedding_pipeline,
+    coerce_late_chunk_tokens,
     coerce_macro_splitter,
     resolve_ingest_embedding_options,
 )
@@ -50,10 +51,14 @@ def _prepare_ingest_embedding_fields(
     embedder_provider: str | None,
     embedding_model: str | None,
     embedding_dimensions: int | str | None,
-) -> tuple[str | None, str | None, str | None, str | None, str | None, int | None]:
+    late_chunk_min_tokens: int | str | None = None,
+    late_chunk_max_tokens: int | str | None = None,
+) -> tuple[str | None, str | None, str | None, str | None, str | None, int | None, int | None, int | None]:
     ep = coerce_embedding_pipeline(embedding_pipeline)
     ms = coerce_macro_splitter(macro_splitter)
     prov = coerce_embedder_provider(embedder_provider)
+    lc_min = coerce_late_chunk_tokens(late_chunk_min_tokens, field="late_chunk_min_tokens")
+    lc_max = coerce_late_chunk_tokens(late_chunk_max_tokens, field="late_chunk_max_tokens")
     base = resolve_ingest_embedding_options(
         settings,
         job_embedding_pipeline=ep,
@@ -61,6 +66,8 @@ def _prepare_ingest_embedding_fields(
         job_embedder_provider=prov,
         job_openai_embedding_model=None,
         job_jina_embedding_model=None,
+        job_late_chunk_min_tokens=lc_min,
+        job_late_chunk_max_tokens=lc_max,
     )
     om: str | None = None
     jm: str | None = None
@@ -77,6 +84,8 @@ def _prepare_ingest_embedding_fields(
         job_embedder_provider=prov,
         job_openai_embedding_model=om,
         job_jina_embedding_model=jm,
+        job_late_chunk_min_tokens=lc_min,
+        job_late_chunk_max_tokens=lc_max,
     )
     dim = _coerce_embedding_dim_int(embedding_dimensions)
     validate_embedding_dimensions(
@@ -85,7 +94,7 @@ def _prepare_ingest_embedding_fields(
         jina_embedding_model=resolved.jina_embedding_model,
         dim=dim,
     )
-    return ep, ms, prov, om, jm, dim
+    return ep, ms, prov, om, jm, dim, lc_min, lc_max
 
 
 class SubmitFileIngestionUseCase:
@@ -113,6 +122,8 @@ class SubmitFileIngestionUseCase:
         macro_splitter: str | None = None,
         embedder_provider: str | None = None,
         embedding_model: str | None = None,
+        late_chunk_min_tokens: int | str | None = None,
+        late_chunk_max_tokens: int | str | None = None,
     ) -> JobCreatedDTO:
         if len(data) > self._settings.max_upload_bytes:
             raise FileTooLargeError("Upload exceeds configured maximum size")
@@ -120,13 +131,15 @@ class SubmitFileIngestionUseCase:
         if ctype not in self._settings.allowed_mime_set:
             raise UnsupportedMimeTypeError(f"Content type not allowed: {ctype}")
         tier = _coerce_llama_parse_tier(llama_parse_tier)
-        ep, ms, prov, om, jm, dims = _prepare_ingest_embedding_fields(
+        ep, ms, prov, om, jm, dims, lc_min, lc_max = _prepare_ingest_embedding_fields(
             self._settings,
             embedding_pipeline=embedding_pipeline,
             macro_splitter=macro_splitter,
             embedder_provider=embedder_provider,
             embedding_model=embedding_model,
             embedding_dimensions=embedding_dimensions,
+            late_chunk_min_tokens=late_chunk_min_tokens,
+            late_chunk_max_tokens=late_chunk_max_tokens,
         )
         job_id = uuid4()
         key = f"{job_id}/{filename or 'upload'}"
@@ -147,6 +160,8 @@ class SubmitFileIngestionUseCase:
                 embedder_provider=prov,
                 openai_embedding_model=om,
                 jina_embedding_model=jm,
+                late_chunk_min_tokens=lc_min,
+                late_chunk_max_tokens=lc_max,
             )
             await session.commit()
         await self._queue.enqueue_process_job(job_id)
@@ -174,16 +189,20 @@ class SubmitUrlIngestionUseCase:
         macro_splitter: str | None = None,
         embedder_provider: str | None = None,
         embedding_model: str | None = None,
+        late_chunk_min_tokens: int | str | None = None,
+        late_chunk_max_tokens: int | str | None = None,
     ) -> JobCreatedDTO:
         job_id = uuid4()
         tier = _coerce_llama_parse_tier(llama_parse_tier)
-        ep, ms, prov, om, jm, dims = _prepare_ingest_embedding_fields(
+        ep, ms, prov, om, jm, dims, lc_min, lc_max = _prepare_ingest_embedding_fields(
             self._settings,
             embedding_pipeline=embedding_pipeline,
             macro_splitter=macro_splitter,
             embedder_provider=embedder_provider,
             embedding_model=embedding_model,
             embedding_dimensions=embedding_dimensions,
+            late_chunk_min_tokens=late_chunk_min_tokens,
+            late_chunk_max_tokens=late_chunk_max_tokens,
         )
         async with self._session_factory() as session:
             jobs: IJobRepository = SqlJobRepository(session)
@@ -199,6 +218,8 @@ class SubmitUrlIngestionUseCase:
                 embedder_provider=prov,
                 openai_embedding_model=om,
                 jina_embedding_model=jm,
+                late_chunk_min_tokens=lc_min,
+                late_chunk_max_tokens=lc_max,
             )
             await session.commit()
         await self._queue.enqueue_process_job(job_id)
@@ -226,19 +247,23 @@ class SubmitTextIngestionUseCase:
         macro_splitter: str | None = None,
         embedder_provider: str | None = None,
         embedding_model: str | None = None,
+        late_chunk_min_tokens: int | str | None = None,
+        late_chunk_max_tokens: int | str | None = None,
     ) -> JobCreatedDTO:
         joined = "\n\n".join(t for t in texts if t)
         if not joined:
             joined = ""
         job_id = uuid4()
         tier = _coerce_llama_parse_tier(llama_parse_tier)
-        ep, ms, prov, om, jm, dims = _prepare_ingest_embedding_fields(
+        ep, ms, prov, om, jm, dims, lc_min, lc_max = _prepare_ingest_embedding_fields(
             self._settings,
             embedding_pipeline=embedding_pipeline,
             macro_splitter=macro_splitter,
             embedder_provider=embedder_provider,
             embedding_model=embedding_model,
             embedding_dimensions=embedding_dimensions,
+            late_chunk_min_tokens=late_chunk_min_tokens,
+            late_chunk_max_tokens=late_chunk_max_tokens,
         )
         async with self._session_factory() as session:
             jobs: IJobRepository = SqlJobRepository(session)
@@ -255,6 +280,8 @@ class SubmitTextIngestionUseCase:
                 embedder_provider=prov,
                 openai_embedding_model=om,
                 jina_embedding_model=jm,
+                late_chunk_min_tokens=lc_min,
+                late_chunk_max_tokens=lc_max,
             )
             await session.commit()
         await self._queue.enqueue_process_job(job_id)

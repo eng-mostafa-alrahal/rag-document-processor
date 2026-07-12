@@ -44,6 +44,8 @@ class IngestionJobModel(Base):
     embedder_provider: Mapped[str | None] = mapped_column(String(16), nullable=True)
     openai_embedding_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     jina_embedding_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    late_chunk_min_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    late_chunk_max_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

@@ -42,6 +42,8 @@ async def job_status(
         macro_splitter=dto.macro_splitter,
         embedder_provider=dto.embedder_provider,
         embedding_model=dto.embedding_model,
+        late_chunk_min_tokens=dto.late_chunk_min_tokens,
+        late_chunk_max_tokens=dto.late_chunk_max_tokens,
         created_at=dto.created_at,
         updated_at=dto.updated_at,
     )

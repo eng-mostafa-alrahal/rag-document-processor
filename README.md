@@ -19,6 +19,48 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 5. `uv run uvicorn rag_document_processor.main:app --reload --app-dir src`
 6. In another terminal: `uv run celery -A rag_document_processor.workers.celery_app worker -l info` (on Windows use `--pool=solo` if the worker crashes)
 
+## Debugging (Cursor / VS Code)
+
+### No Docker (recommended for late-chunking)
+
+Pipeline-only: **no Postgres, Redis, Celery, or Docker**. Fake embedder by default (no Jina bill).
+
+1. `uv sync --extra dev`
+2. Open **Run and Debug** (`Ctrl+Shift+D`) → **Debug: late-chunk (no Docker)** → **F5**
+3. Set breakpoints in `LateChunkingPipeline.process`, `merge_segments`, `batch_chunks`, or `macro_splitters.py`
+
+Other no-Docker configs:
+
+| Configuration | Use when |
+|---------------|----------|
+| **Debug: late-chunk (no Docker)** | Built-in sample text; split → merge → batch |
+| **Debug: late-chunk + file (no Docker)** | Prompts for a `.txt` / `.md` / `.pdf` / `.docx` path |
+| **Debug: late-chunk + Jina (no Docker)** | Real Jina call (needs `JINA_API_KEY` in `.env` only) |
+
+CLI:
+
+```bash
+uv run python scripts/debug_late_chunk.py
+uv run python scripts/debug_late_chunk.py --file README.md
+uv run python scripts/debug_late_chunk.py --min-tokens 128 --max-tokens 256
+uv run python scripts/debug_late_chunk.py --jina
+```
+
+### Full API / worker (needs Postgres + Redis)
+
+These do **not** require Docker *containers*, but Postgres and Redis must be reachable at the URLs in `.env` (local install **or** Docker).
+
+| Configuration | Use when |
+|---------------|----------|
+| **Full stack: API + Celery (needs Postgres+Redis)** | Bruno/curl ingest end-to-end |
+| **FastAPI (needs Postgres+Redis)** | Submit/validation (`submit.py`, `ingest.py`) |
+| **Celery worker (needs Postgres+Redis)** | Worker + pipeline — use instead of a plain terminal worker |
+| **Debug: process job by id (needs Postgres+Redis)** | Re-run an existing `job_id` without Celery |
+
+```bash
+uv run python scripts/debug_process_job.py <job-uuid>
+```
+
 ## Authentication
 
 The service is API-key based: any client holding a valid key may use it. Keys are

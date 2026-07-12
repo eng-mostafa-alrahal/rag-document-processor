@@ -75,6 +75,8 @@ Code lives under `src/rag_document_processor/`:
 1. **Submit** (`presentation` → `Submit*UseCase`) validates options, persists a **job** row, enqueues Celery.
 2. **Worker** runs `ProcessIngestionJobUseCase`: load job → extract text → `resolve_ingest_embedding_options` + `build_embedding_pipeline` → stream chunks to **Redis** via `IEmbeddingSink`.
 
+**Late chunking** (`LateChunkingPipeline`) additionally **enhances** then **batches** before embedding: macro split → sentences → merge tiny fragments into denser chunks (`late_chunk_min_tokens`..`late_chunk_max_tokens`, see `infrastructure/pipelines/late_chunk_enhancer.py`) → pack chunks into Jina requests under `LATE_CHUNK_BATCH_TOKENS` so each `late_chunking=true` call keeps shared context. This avoids one-vector-per-sentence noise that hurts RAG.
+
 When you add behavior, ask: *Is this business rule (domain), orchestration (application), or an adapter (infrastructure)?*
 
 ## Configuration

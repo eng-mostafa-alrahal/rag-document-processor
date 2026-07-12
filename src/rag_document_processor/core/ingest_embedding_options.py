@@ -24,6 +24,11 @@ PipelineKind = Literal["late_chunking", "chunk_then_embed"]
 MacroKind = Literal["semantic", "recursive", "token_aware"]
 
 
+# Bounds for late-chunking token controls (per-job + env validation).
+LATE_CHUNK_TOKEN_MIN: int = 1
+LATE_CHUNK_TOKEN_MAX: int = 8192
+
+
 @dataclass(frozen=True, slots=True)
 class ResolvedIngestEmbeddingOptions:
     embedding_pipeline: PipelineKind
@@ -31,6 +36,10 @@ class ResolvedIngestEmbeddingOptions:
     embedder: EmbedderKind
     openai_embedding_model: str
     jina_embedding_model: str
+    # Late-chunking enhance/batch controls (resolved from per-job overrides or env).
+    late_chunk_min_tokens: int
+    late_chunk_max_tokens: int
+    late_chunk_batch_tokens: int
 
 
 def _norm_opt_str(v: str | None) -> str | None:
@@ -87,6 +96,39 @@ def coerce_embedding_model(raw: str | None, *, field: str, max_len: int = 128) -
     return s
 
 
+def coerce_late_chunk_tokens(raw: int | str | None, *, field: str) -> int | None:
+    """Validate an optional per-job late-chunk token limit; None => use env default."""
+    if raw is None or (isinstance(raw, str) and not str(raw).strip()):
+        return None
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError) as exc:
+        raise InvalidIngestEmbeddingOptionsError(f"{field} must be an integer.") from exc
+    if value < LATE_CHUNK_TOKEN_MIN or value > LATE_CHUNK_TOKEN_MAX:
+        raise InvalidIngestEmbeddingOptionsError(
+            f"{field} must be between {LATE_CHUNK_TOKEN_MIN} and {LATE_CHUNK_TOKEN_MAX}. Got {value}."
+        )
+    return value
+
+
+def _resolve_late_chunk_tokens(
+    settings: Settings,
+    *,
+    job_min_tokens: int | None,
+    job_max_tokens: int | None,
+) -> tuple[int, int, int]:
+    lc_min = job_min_tokens if job_min_tokens is not None else settings.late_chunk_min_tokens
+    lc_max = job_max_tokens if job_max_tokens is not None else settings.late_chunk_max_tokens
+    lc_batch = settings.late_chunk_batch_tokens
+    if lc_min < 1 or lc_max < 1 or lc_batch < 1:
+        raise InvalidIngestEmbeddingOptionsError("late-chunk token limits must be positive integers.")
+    if lc_min > lc_max:
+        raise InvalidIngestEmbeddingOptionsError(
+            f"late_chunk_min_tokens ({lc_min}) cannot exceed late_chunk_max_tokens ({lc_max})."
+        )
+    return lc_min, lc_max, lc_batch
+
+
 def resolve_ingest_embedding_options(
     settings: Settings,
     *,
@@ -95,6 +137,8 @@ def resolve_ingest_embedding_options(
     job_embedder_provider: str | None,
     job_openai_embedding_model: str | None,
     job_jina_embedding_model: str | None,
+    job_late_chunk_min_tokens: int | None = None,
+    job_late_chunk_max_tokens: int | None = None,
 ) -> ResolvedIngestEmbeddingOptions:
     pipeline_raw = job_embedding_pipeline or settings.embedding_pipeline
     if pipeline_raw not in EMBEDDING_PIPELINE_CHOICES:
@@ -115,6 +159,12 @@ def resolve_ingest_embedding_options(
     if not jina_model:
         raise InvalidIngestEmbeddingOptionsError("Resolved Jina embedding model name is empty.")
 
+    lc_min, lc_max, lc_batch = _resolve_late_chunk_tokens(
+        settings,
+        job_min_tokens=job_late_chunk_min_tokens,
+        job_max_tokens=job_late_chunk_max_tokens,
+    )
+
     if pipeline == "late_chunking":
         if job_embedder_provider == "openai":
             raise InvalidIngestEmbeddingOptionsError(
@@ -130,6 +180,9 @@ def resolve_ingest_embedding_options(
             embedder="jina",
             openai_embedding_model=openai_model,
             jina_embedding_model=jina_model,
+            late_chunk_min_tokens=lc_min,
+            late_chunk_max_tokens=lc_max,
+            late_chunk_batch_tokens=lc_batch,
         )
 
     # chunk_then_embed
@@ -163,4 +216,7 @@ def resolve_ingest_embedding_options(
         embedder=embedder,
         openai_embedding_model=openai_model,
         jina_embedding_model=jina_model,
+        late_chunk_min_tokens=lc_min,
+        late_chunk_max_tokens=lc_max,
+        late_chunk_batch_tokens=lc_batch,
     )

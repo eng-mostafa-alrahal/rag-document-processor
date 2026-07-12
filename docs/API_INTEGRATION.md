@@ -171,6 +171,8 @@ Form fields:
 | `embedding_pipeline` | No | `chunk_then_embed` or `late_chunking` |
 | `macro_splitter` | No | `recursive`, `semantic`, or `token_aware` |
 | `embedder_provider` | No | `openai` or `jina` |
+| `late_chunk_min_tokens` | No | `late_chunking` only: min tokens per merged chunk (fewer, denser chunks) |
+| `late_chunk_max_tokens` | No | `late_chunking` only: max tokens per merged chunk |
 | `llama_parse_tier` | No | PDF/DOCX parse tier: `fast`, `cost_effective`, `agentic`, `agentic_plus` |
 
 **curl example:**
@@ -226,6 +228,8 @@ All optional ingest fields below apply to **`POST /ingest/text`**, **`POST /inge
 | `llama_parse_tier` | No | enum | **`fast`**, **`cost_effective`**, **`agentic`**, **`agentic_plus`** — PDF/DOCX parsing only |
 | `embedding_model` | No | string | Provider model id (not an enum). Examples: `text-embedding-3-small`, `text-embedding-3-large`, `jina-embeddings-v3`. Omit to use server defaults. |
 | `embedding_dimensions` | No | integer | **Not a fixed enum** — valid range depends on `embedding_model`. Request accepts `1`–`16384`; server validates against model. Use `GET /embeddings/dimension-constraints` for min/max per model family. |
+| `late_chunk_min_tokens` | No | integer | **`late_chunking` only.** Min tokens before a merged chunk is finalized (`1`–`8192`). Higher → fewer, denser chunks. Omit to use `LATE_CHUNK_MIN_TOKENS`. Must be ≤ `late_chunk_max_tokens`. Ignored for `chunk_then_embed`. |
+| `late_chunk_max_tokens` | No | integer | **`late_chunking` only.** Max tokens per merged chunk (`1`–`8192`). Omit to use `LATE_CHUNK_MAX_TOKENS`. Ignored for `chunk_then_embed`. |
 
 **Cross-field rules (validation):**
 
@@ -235,6 +239,7 @@ All optional ingest fields below apply to **`POST /ingest/text`**, **`POST /inge
 | `chunk_then_embed` | `embedder_provider` optional; if omitted, server picks OpenAI when configured, else Jina. |
 | `embedding_model` | Applied to whichever provider the job resolves to (OpenAI or Jina). |
 | `semantic` splitter | Requires OpenAI embeddings on the server (used internally for semantic chunking). |
+| `late_chunk_min_tokens` / `late_chunk_max_tokens` | Only affect `late_chunking`. `min > max` → **422**. Adjacent fragments are merged into chunks within this token range, then batched (≤ `LATE_CHUNK_BATCH_TOKENS`) into shared-context Jina requests. |
 
 **Response-only enums** (job status / results):
 

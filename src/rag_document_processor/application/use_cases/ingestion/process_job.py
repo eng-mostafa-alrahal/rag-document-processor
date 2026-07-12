@@ -71,6 +71,8 @@ class ProcessIngestionJobUseCase:
             job_embedder_provider = job.embedder_provider
             job_openai_embedding_model = job.openai_embedding_model
             job_jina_embedding_model = job.jina_embedding_model
+            job_late_chunk_min_tokens = job.late_chunk_min_tokens
+            job_late_chunk_max_tokens = job.late_chunk_max_tokens
             await jobs.update_status(jid, status=JobStatus.PROCESSING, error_message=None)
             await session.commit()
 
@@ -113,6 +115,8 @@ class ProcessIngestionJobUseCase:
                 job_embedder_provider=job_embedder_provider,
                 job_openai_embedding_model=job_openai_embedding_model,
                 job_jina_embedding_model=job_jina_embedding_model,
+                job_late_chunk_min_tokens=job_late_chunk_min_tokens,
+                job_late_chunk_max_tokens=job_late_chunk_max_tokens,
             )
             pipeline = build_embedding_pipeline(self._settings, self._httpx, resolved)
 
@@ -124,13 +128,17 @@ class ProcessIngestionJobUseCase:
                 dim=dims,
             )
 
-            meta = {
+            meta: dict[str, object] = {
                 "job_id": str(jid),
                 "source_kind": source_kind.value,
                 "embedding_pipeline": resolved.embedding_pipeline,
                 "macro_splitter": resolved.macro_splitter,
                 "embedder": resolved.embedder,
             }
+            if resolved.embedding_pipeline == "late_chunking":
+                meta["late_chunk_min_tokens"] = resolved.late_chunk_min_tokens
+                meta["late_chunk_max_tokens"] = resolved.late_chunk_max_tokens
+                meta["late_chunk_batch_tokens"] = resolved.late_chunk_batch_tokens
             chunks = 0
             async for chunk in pipeline.process(raw_text, metadata=meta, embedding_dimensions=dims):
                 await self._sink.emit(jid, chunk)

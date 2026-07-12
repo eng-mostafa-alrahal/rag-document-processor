@@ -1,0 +1,134 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: late-chunk (no Docker)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/debug_late_chunk.py",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "ENV": "dev",
+        "STORAGE_BACKEND": "local"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug: late-chunk + file (no Docker)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/debug_late_chunk.py",
+      "args": ["--file", "${input:sampleFile}"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "ENV": "dev",
+        "STORAGE_BACKEND": "local"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug: late-chunk + Jina (no Docker)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/debug_late_chunk.py",
+      "args": ["--jina"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "ENV": "dev",
+        "STORAGE_BACKEND": "local"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "FastAPI (needs Postgres+Redis)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "rag_document_processor.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000",
+        "--app-dir",
+        "src"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Celery worker (needs Postgres+Redis)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "celery",
+      "args": [
+        "-A",
+        "rag_document_processor.workers.celery_app",
+        "worker",
+        "-l",
+        "info",
+        "--pool=solo"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug: process job by id (needs Postgres+Redis)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/debug_process_job.py",
+      "args": ["${input:jobId}"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full stack: API + Celery (needs Postgres+Redis)",
+      "configurations": [
+        "FastAPI (needs Postgres+Redis)",
+        "Celery worker (needs Postgres+Redis)"
+      ],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "jobId",
+      "type": "promptString",
+      "description": "Job UUID from POST /ingest/* (must already exist in Postgres)",
+      "default": ""
+    },
+    {
+      "id": "sampleFile",
+      "type": "promptString",
+      "description": "Path to a .txt / .md / .pdf / .docx to chunk (relative to workspace)",
+      "default": "README.md"
+    }
+  ]
+}

@@ -41,5 +41,7 @@ class JobStatusDTO:
     macro_splitter: str
     embedder_provider: str
     embedding_model: str
+    late_chunk_min_tokens: int
+    late_chunk_max_tokens: int
     created_at: str
     updated_at: str

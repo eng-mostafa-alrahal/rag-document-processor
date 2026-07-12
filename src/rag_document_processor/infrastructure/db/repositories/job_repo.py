@@ -26,6 +26,8 @@ def _job_from_row(row: IngestionJobModel) -> IngestionJob:
         embedder_provider=row.embedder_provider,
         openai_embedding_model=row.openai_embedding_model,
         jina_embedding_model=row.jina_embedding_model,
+        late_chunk_min_tokens=row.late_chunk_min_tokens,
+        late_chunk_max_tokens=row.late_chunk_max_tokens,
         error_message=row.error_message,
         chunks_emitted=row.chunks_emitted,
         created_at=row.created_at,
@@ -55,6 +57,8 @@ class SqlJobRepository:
         embedder_provider: str | None = None,
         openai_embedding_model: str | None = None,
         jina_embedding_model: str | None = None,
+        late_chunk_min_tokens: int | None = None,
+        late_chunk_max_tokens: int | None = None,
     ) -> IngestionJob:
         row = IngestionJobModel(
             id=job_id,
@@ -72,6 +76,8 @@ class SqlJobRepository:
             embedder_provider=embedder_provider,
             openai_embedding_model=openai_embedding_model,
             jina_embedding_model=jina_embedding_model,
+            late_chunk_min_tokens=late_chunk_min_tokens,
+            late_chunk_max_tokens=late_chunk_max_tokens,
             chunks_emitted=0,
         )
         self._session.add(row)
