@@ -136,12 +136,11 @@ X-API-Key: rag_...
   "macro_splitter": "recursive",
   "embedder_provider": "openai",
   "embedding_model": "text-embedding-3-small",
-  "embedding_dimensions": 1536,
-  "llama_parse_tier": "agentic"
+  "embedding_dimensions": 1536
 }
 ```
 
-Only `texts` is required; omit any optional field to use server defaults. See **Request & response enumerations** below for all allowed values.
+Only `texts` is required; omit any optional field to use server defaults. See **Request & response enumerations** below for all allowed values. (`llama_parse_tier` is accepted but ignored for plain-text jobs.)
 
 **Response (200):**
 
@@ -213,6 +212,36 @@ GET /api/v1/embeddings/dimension-constraints
 
 Invalid combinations return **422** with `code: invalid_embedding_dimensions` and allowed min/max in the body.
 
+**Example catalog response (shape):**
+
+```json
+{
+  "rules": [
+    {
+      "provider": "openai",
+      "label": "OpenAI text-embedding-3-small",
+      "match": "Model id contains `embedding-3-small`, or ends with `3-small` (short ids).",
+      "model_id_substrings_any": ["embedding-3-small"],
+      "model_example_ids": ["text-embedding-3-small"],
+      "min_dimensions": 256,
+      "max_dimensions": 1536,
+      "recommended_dimensions": null,
+      "notes": "Matryoshka sizes supported by OpenAI for this model; bounds are inclusive."
+    }
+  ]
+}
+```
+
+### Late chunking (integrators)
+
+When `embedding_pipeline` is `late_chunking` (or that is the server default):
+
+1. Text is split into sentence/paragraph fragments.
+2. Adjacent fragments are **merged** into denser chunks within `late_chunk_min_tokens`..`late_chunk_max_tokens` (defaults from `LATE_CHUNK_MIN_TOKENS` / `LATE_CHUNK_MAX_TOKENS`).
+3. Those chunks are **batched** into shared-context Jina requests under `LATE_CHUNK_BATCH_TOKENS` (server-only; not a per-request field).
+
+Expect more chunks than PDF pages: chunk count follows text structure and token bounds, not page count. Raise `late_chunk_min_tokens` / `late_chunk_max_tokens` for fewer, denser vectors.
+
 ### Request & response enumerations (complete reference)
 
 All optional ingest fields below apply to **`POST /ingest/text`**, **`POST /ingest/url`**, and **`POST /ingest/file`** (multipart form field names match the JSON keys).
@@ -220,13 +249,13 @@ All optional ingest fields below apply to **`POST /ingest/text`**, **`POST /inge
 | Field | Required | Type | Allowed values / notes |
 |-------|----------|------|------------------------|
 | `texts` | Yes (text only) | `string[]` | Non-empty strings; joined with blank lines |
-| `url` | Yes (url only) | `string` (HTTPS URL) | Must be a valid `http://` or `https://` URL |
+| `url` | Yes (url only) | `string` (URL) | Must be a valid `http://` or `https://` URL |
 | `file` | Yes (file only) | binary | See allowed content types below |
 | `embedding_pipeline` | No | enum | **`chunk_then_embed`**, **`late_chunking`** |
 | `macro_splitter` | No | enum | **`recursive`**, **`semantic`**, **`token_aware`** |
 | `embedder_provider` | No | enum | **`openai`**, **`jina`** — only for `chunk_then_embed`; ignored when pipeline is `late_chunking` |
-| `llama_parse_tier` | No | enum | **`fast`**, **`cost_effective`**, **`agentic`**, **`agentic_plus`** — PDF/DOCX parsing only |
-| `embedding_model` | No | string | Provider model id (not an enum). Examples: `text-embedding-3-small`, `text-embedding-3-large`, `jina-embeddings-v3`. Omit to use server defaults. |
+| `llama_parse_tier` | No | enum | **`fast`**, **`cost_effective`**, **`agentic`**, **`agentic_plus`** — PDF/DOCX parsing only; ignored for plain-text jobs (must still be a valid tier if sent) |
+| `embedding_model` | No | string | Provider model id (not an enum). Examples: `text-embedding-3-small`, `text-embedding-3-large`, `jina-embeddings-v3`. Omit to use server defaults. Must be a real model id (not OpenAPI placeholders like `"string"`). |
 | `embedding_dimensions` | No | integer | **Not a fixed enum** — valid range depends on `embedding_model`. Request accepts `1`–`16384`; server validates against model. Use `GET /embeddings/dimension-constraints` for min/max per model family. |
 | `late_chunk_min_tokens` | No | integer | **`late_chunking` only.** Min tokens before a merged chunk is finalized (`1`–`8192`). Higher → fewer, denser chunks. Omit to use `LATE_CHUNK_MIN_TOKENS`. Must be ≤ `late_chunk_max_tokens`. Ignored for `chunk_then_embed`. |
 | `late_chunk_max_tokens` | No | integer | **`late_chunking` only.** Max tokens per merged chunk (`1`–`8192`). Omit to use `LATE_CHUNK_MAX_TOKENS`. Ignored for `chunk_then_embed`. |
@@ -265,15 +294,18 @@ URL ingest accepts the same types after fetch (plus `text/plain` / `text/markdow
 GET /api/v1/embeddings/dimension-constraints
 ```
 
-Example rules (subject to server version):
+Example rules (subject to server version — prefer the live catalog):
 
 | Provider | Example model | Min | Max |
 |----------|---------------|-----|-----|
 | OpenAI | `text-embedding-3-small` | 256 | 1536 |
 | OpenAI | `text-embedding-3-large` | 256 | 3072 |
-| Jina | `jina-embeddings-v3` | 256 | 1024 |
+| Jina | `jina-embeddings-v3` | 32 | 1024 |
+| Jina | `jina-embeddings-v4` | 128 | 1024 |
+| Jina | `jina-embeddings-v5-text-small` | 1 | 1024 |
+| Jina | `jina-embeddings-v5-text-nano` | 1 | 768 |
 
-Always prefer the API response over this table when choosing dimensions.
+The catalog response is ordered most-specific-first; the first matching rule for a model id wins. Always prefer the API response over this table when choosing dimensions.
 
 ### Upload limits
 
@@ -290,6 +322,8 @@ GET /api/v1/jobs/{job_id}
 X-API-Key: rag_...
 ```
 
+Embedding-related fields are **effective** values: per-job overrides merged with the deployment defaults (not raw nulls for “used env default”). Any valid API key may poll any job.
+
 **Response (200):**
 
 ```json
@@ -305,10 +339,14 @@ X-API-Key: rag_...
   "macro_splitter": "recursive",
   "embedder_provider": "openai",
   "embedding_model": "text-embedding-3-small",
+  "late_chunk_min_tokens": 256,
+  "late_chunk_max_tokens": 512,
   "created_at": "2026-06-06T12:00:00+00:00",
   "updated_at": "2026-06-06T12:00:05+00:00"
 }
 ```
+
+`late_chunk_min_tokens` / `late_chunk_max_tokens` are always present (resolved from the job or `LATE_CHUNK_*` env defaults). They only affect processing when `embedding_pipeline` is `late_chunking`.
 
 ### Job status values
 
@@ -389,14 +427,33 @@ Errors use a consistent JSON shape:
 
 | HTTP | `code` | When |
 |------|--------|------|
+| 400 | `url_fetch_error` | URL ingest could not fetch the remote document |
+| 400 | `domain_error` | Other domain validation failures |
 | 401 | — | Missing or invalid `X-API-Key` |
 | 404 | `job_not_found` | Unknown `job_id` |
 | 409 | `job_results_not_ready` | Results requested while job is still `pending` / `processing` |
 | 413 | `payload_too_large` | File or URL body too large |
 | 415 | `unsupported_media_type` | File type not allowed |
-| 422 | `invalid_embedding_dimensions` | Bad `embedding_dimensions` for model |
+| 422 | `invalid_embedding_dimensions` | Bad `embedding_dimensions` for model (see extra fields below) |
 | 422 | `invalid_llama_parse_tier` | Unknown parse tier |
-| 422 | `invalid_ingest_embedding_options` | Invalid pipeline / splitter / provider combo |
+| 422 | `invalid_ingest_embedding_options` | Invalid pipeline / splitter / provider / late-chunk token combo |
+
+For **`invalid_embedding_dimensions`**, the body also includes structured fields so clients can correct the request without parsing the message:
+
+```json
+{
+  "detail": "...",
+  "code": "invalid_embedding_dimensions",
+  "active_embedder": "jina",
+  "embedding_model": "jina-embeddings-v3",
+  "requested_dimensions": 31,
+  "reason": "out_of_range",
+  "allowed_dimensions_min": 32,
+  "allowed_dimensions_max": 1024
+}
+```
+
+`reason` is typically `out_of_range`, `model_does_not_support_custom_dimensions`, or `placeholder_model_id`.
 
 ---
 

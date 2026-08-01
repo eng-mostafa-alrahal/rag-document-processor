@@ -77,10 +77,10 @@ stored hashed in Postgres and managed by an operator.
 - `POST /api/v1/api-keys` — create a key (admin; returns the secret once)
 - `GET /api/v1/api-keys` — list keys (admin; secrets never returned)
 - `DELETE /api/v1/api-keys/{key_id}` — revoke a key (admin)
-- `POST /api/v1/ingest/file` — multipart upload (`X-API-Key`); optional `llama_parse_tier`, `embedding_pipeline`, `macro_splitter`, `embedder_provider`, `embedding_model`, `embedding_dimensions` (see OpenAPI `/docs`)
+- `POST /api/v1/ingest/file` — multipart upload (`X-API-Key`); optional `llama_parse_tier`, `embedding_pipeline`, `macro_splitter`, `embedder_provider`, `embedding_model`, `embedding_dimensions`, `late_chunk_min_tokens`, `late_chunk_max_tokens` (see OpenAPI `/docs`)
 - `POST /api/v1/ingest/url` — JSON with `url` and the same optional ingest fields as file/text
 - `POST /api/v1/ingest/text` — JSON `{ "texts": ["..."] }` plus optional ingest fields
-- `GET /api/v1/jobs/{job_id}` — job status (effective resolved tier, pipeline, splitter, provider, `embedding_model`, dimensions, etc.)
+- `GET /api/v1/jobs/{job_id}` — job status (effective resolved tier, pipeline, splitter, provider, `embedding_model`, dimensions, late-chunk token bounds, etc.)
 - `GET /api/v1/jobs/{job_id}/results` — all embedded chunks (text + vectors + metadata) for downstream RAG; poll status until `completed` or `failed`
 - `GET /api/v1/embeddings/dimension-constraints` — allowed embedding output sizes by model family (for clients and OpenAPI users)
 

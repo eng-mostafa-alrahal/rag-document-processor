@@ -82,7 +82,7 @@ When you add behavior, ask: *Is this business rule (domain), orchestration (appl
 ## Configuration
 
 - **Single source of truth for env vars:** `core/config.py` (Pydantic `Settings`) and **`.env.example`** (document every variable you add).
-- Per-job overrides (embedding pipeline, splitter, provider, **embedding_model**, dimensions, Llama tier) are validated at **submit** and again in **process_job** against resolved settings.
+- Per-job overrides (embedding pipeline, splitter, provider, **embedding_model**, dimensions, late-chunk min/max tokens, Llama tier) are validated at **submit** and again in **process_job** against resolved settings.
 
 ## API surface (quick reference)
 
