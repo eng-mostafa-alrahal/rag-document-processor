@@ -12,6 +12,20 @@ FastAPI + Clean Architecture ingestion pipeline: upload file, URL, or text; Cele
 
 ## Quick start
 
+### Shared infra + app (recommended locally)
+
+```bash
+cp .env.example .env   # set API_KEY_ADMIN_SECRET and embedding API keys
+docker compose up -d                                      # shared-infra: Postgres, Redis, MinIO
+docker compose -f docker-compose.app.yml up -d --build    # rag-app: API + worker
+# http://127.0.0.1:8000/docs
+docker compose -f docker-compose.app.yml exec api python scripts/create_api_key.py "dev"
+```
+
+Infra is project **`shared-infra`** on Docker network **`shared-net`** (reusable by other local services). Stop only the app: `docker compose -f docker-compose.app.yml down`. See [docs/ONBOARDING.md](docs/ONBOARDING.md).
+
+### Hybrid (infra in Docker, app on host)
+
 1. Copy `.env.example` to `.env` and set secrets.
 2. `docker compose up -d` (Postgres, Redis, MinIO).
 3. `uv sync --extra dev`

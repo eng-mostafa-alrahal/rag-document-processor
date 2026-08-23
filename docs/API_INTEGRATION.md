@@ -130,7 +130,7 @@ X-API-Key: rag_...
 {
   "texts": [
     "First paragraph or document section.",
-    "Optional second segment (joined with blank lines)."
+    "Second segment (embedded independently — not joined into one document)."
   ],
   "embedding_pipeline": "chunk_then_embed",
   "macro_splitter": "recursive",
@@ -142,6 +142,7 @@ X-API-Key: rag_...
 
 Only `texts` is required; omit any optional field to use server defaults. See **Request & response enumerations** below for all allowed values. (`llama_parse_tier` is accepted but ignored for plain-text jobs.)
 
+Each string in `texts` is processed on its own (so two short strings produce two embedding vectors). A long string may still be split into multiple chunks by the pipeline.
 **Response (200):**
 
 ```json
@@ -248,7 +249,7 @@ All optional ingest fields below apply to **`POST /ingest/text`**, **`POST /inge
 
 | Field | Required | Type | Allowed values / notes |
 |-------|----------|------|------------------------|
-| `texts` | Yes (text only) | `string[]` | Non-empty strings; joined with blank lines |
+| `texts` | Yes (text only) | `string[]` | Each string is embedded independently |
 | `url` | Yes (url only) | `string` (URL) | Must be a valid `http://` or `https://` URL |
 | `file` | Yes (file only) | binary | See allowed content types below |
 | `embedding_pipeline` | No | enum | **`chunk_then_embed`**, **`late_chunking`** |

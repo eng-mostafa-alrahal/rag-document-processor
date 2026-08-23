@@ -10,21 +10,56 @@ Welcome. This guide orients you to the codebase, local development, and how we e
 
 ## Prerequisites
 
-- **Python** 3.11+ (see `pyproject.toml`).
-- **[uv](https://docs.astral.sh/uv/)** for dependencies and virtualenv (repo assumes `uv run …`).
-- **Docker** (optional but recommended) for Postgres + Redis + MinIO via `docker compose`.
+- **Python** 3.11+ (see `pyproject.toml`) — only required for the hybrid “infra in Docker, app on host” workflow.
+- **[uv](https://docs.astral.sh/uv/)** for dependencies and virtualenv when running the API/worker on the host.
+- **Docker Desktop** (or Docker Engine + Compose) for local infra or the full all-in-Docker stack.
 - API keys as needed: **Jina**, **OpenAI**, **LlamaCloud** (for cloud PDF/DOCX parse)—see `.env.example`.
 
-## First-day setup
+## Local run modes
+
+### A — Shared infra + separate app (recommended locally)
+
+**Postgres / Redis / MinIO** run as a generic Compose project **`shared-infra`** (not RAG-branded). Any other local service can join the Docker network **`shared-net`** and reuse them. This repo’s API/worker run as project **`rag-app`**.
+
+1. Copy `.env.example` → `.env` and set `API_KEY_ADMIN_SECRET` plus embedding keys (`JINA_API_KEY` / `OPENAI_API_KEY`).
+2. Start **shared infra** (ports published for DBeaver / Redis Insight):
+   ```bash
+   docker compose up -d
+   ```
+   Docker Desktop project **`shared-infra`**: `shared-infra-postgres-1`, `shared-infra-redis-1`, `shared-infra-minio-1`.
+3. Start **this app** (joins `shared-net`; talks to `postgres` / `redis` / `minio` by service name):
+   ```bash
+   docker compose -f docker-compose.app.yml up -d --build
+   ```
+   Project **`rag-app`**: `rag-app-api-1`, `rag-app-worker-1`. File uploads use MinIO bucket `rag-uploads` (created automatically on first upload if missing).
+4. Open **http://127.0.0.1:8000/docs**.
+5. Mint an API key:
+   ```bash
+   docker compose -f docker-compose.app.yml exec api python scripts/create_api_key.py "dev"
+   ```
+6. **Inspect Postgres (DBeaver):** Host `localhost`, Port `5432`, Database `rag`, User `rag`, Password `rag`. Tables: `api_keys`, `ingestion_jobs`.
+7. **Inspect Redis:** Host `localhost`, Port `6379`, no password.
+   - DB **0** = embedding streams (`ingest:{job_id}`), **1** = Celery broker, **2** = Celery results.
+8. Stop **only this app** (shared DB/Redis stay up for other services):
+   ```bash
+   docker compose -f docker-compose.app.yml down
+   ```
+   Stop **shared infra** (when nothing else needs it): `docker compose down` (add `-v` only if you intend to wipe Postgres/MinIO data).
+
+**Other services:** attach to external network `shared-net` and use hostnames `postgres`, `redis`, `minio` (or `localhost` + published ports from the host).
+
+Legacy all-in-one file: `docker-compose.prod.yml` (optional `docker-compose.local-ports.yml` to publish ports). Prefer the split stacks above for local use.
+
+### B — Infra in Docker, API/worker on the host (day-to-day development)
 
 1. **Clone** the repo and open the **repository root** in Cursor (so paths and rules resolve correctly).
 
 2. **Environment**
    - Copy `.env.example` → `.env`.
-   - For local Docker: defaults in `.env.example` often match `docker compose` (Postgres `rag`/`rag`, Redis `6379`).
-   - For **cloud Redis** (e.g. Redis Cloud): use the full URL including DB index; ensure **broker**, **results**, and **stream** DB indices match how you deploy (see `.env.example` comments).
+   - Defaults match `docker compose` (Postgres `rag`/`rag`, Redis `localhost:6379`).
+   - For **cloud Redis** instead of the compose Redis service: use the full URL including DB index; ensure **broker**, **results**, and **stream** DB indices match (see `.env.example` comments).
 
-3. **Infrastructure**
+3. **Infrastructure** (Postgres + Redis + MinIO)
    ```bash
    docker compose up -d
    ```

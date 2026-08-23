@@ -1,0 +1,71 @@
+# App only: API + Celery worker (project: rag-app).
+# Requires shared infra already running from this repo (or any compose that publishes
+# postgres/redis/minio on the external Docker network `shared-net`):
+#   docker compose up -d
+#   docker compose -f docker-compose.app.yml up -d --build
+#
+# Stop app without touching shared DB/Redis:
+#   docker compose -f docker-compose.app.yml down
+name: rag-app
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      ENV: production
+      DATABASE_AUTO_CREATE: "true"
+      DATABASE_AUTO_MIGRATE: "true"
+      DATABASE_URL: postgresql+asyncpg://rag:rag@postgres:5432/rag
+      DATABASE_URL_SYNC: postgresql://rag:rag@postgres:5432/rag
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM_DB: "0"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET_NAME: rag-uploads
+      S3_REGION: us-east-1
+    networks: [shared-net]
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command:
+      [
+        "celery",
+        "-A",
+        "rag_document_processor.workers.celery_app",
+        "worker",
+        "-l",
+        "info",
+        "--concurrency=2",
+      ]
+    env_file: .env
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+asyncpg://rag:rag@postgres:5432/rag
+      DATABASE_URL_SYNC: postgresql://rag:rag@postgres:5432/rag
+      REDIS_URL: redis://redis:6379/0
+      REDIS_STREAM_DB: "0"
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_BUCKET_NAME: rag-uploads
+      S3_REGION: us-east-1
+    networks: [shared-net]
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+networks:
+  shared-net:
+    external: true

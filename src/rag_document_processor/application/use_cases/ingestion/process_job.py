@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from uuid import UUID
 
@@ -27,6 +28,24 @@ log = logging.getLogger(__name__)
 
 def _normalize_ctype(ctype: str | None) -> str:
     return (ctype or "application/octet-stream").split(";")[0].strip().lower()
+
+
+def texts_from_source_text(source_text: str | None) -> list[str]:
+    """Decode text-ingest payload.
+
+    New jobs store a JSON array of strings (one embedding unit per item).
+    Older jobs stored a single joined string — treat those as one segment.
+    """
+    raw = source_text or ""
+    if not raw:
+        return [""]
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return [raw]
+    if isinstance(parsed, list) and all(isinstance(item, str) for item in parsed):
+        return parsed if parsed else [""]
+    return [raw]
 
 
 class ProcessIngestionJobUseCase:
@@ -80,7 +99,7 @@ class ProcessIngestionJobUseCase:
             await self._sink.clear(jid)
 
             if source_kind == SourceKind.TEXT:
-                raw_text = source_text or ""
+                text_segments = texts_from_source_text(source_text)
             elif source_kind == SourceKind.URL:
                 if not source_url:
                     raise ValueError("URL job missing source_url")
@@ -91,22 +110,26 @@ class ProcessIngestionJobUseCase:
                 allowed = self._settings.allowed_mime_set | {"text/plain", "text/markdown"}
                 if ctype_norm not in allowed:
                     raise UnsupportedMimeTypeError(f"URL content type not allowed: {ctype_norm}")
-                raw_text = await self._extractor.extract(
-                    body,
-                    content_type=ctype_norm,
-                    filename=source_url.rsplit("/", maxsplit=1)[-1] or None,
-                    llama_parse_tier=llama_parse_tier,
-                )
+                text_segments = [
+                    await self._extractor.extract(
+                        body,
+                        content_type=ctype_norm,
+                        filename=source_url.rsplit("/", maxsplit=1)[-1] or None,
+                        llama_parse_tier=llama_parse_tier,
+                    )
+                ]
             else:
                 if not blob_key:
                     raise ValueError("File job missing blob_key")
                 body = await self._blobs.get_bytes(blob_key)
-                raw_text = await self._extractor.extract(
-                    body,
-                    content_type=content_type,
-                    filename=original_filename,
-                    llama_parse_tier=llama_parse_tier,
-                )
+                text_segments = [
+                    await self._extractor.extract(
+                        body,
+                        content_type=content_type,
+                        filename=original_filename,
+                        llama_parse_tier=llama_parse_tier,
+                    )
+                ]
 
             resolved = resolve_ingest_embedding_options(
                 self._settings,
@@ -128,21 +151,25 @@ class ProcessIngestionJobUseCase:
                 dim=dims,
             )
 
-            meta: dict[str, object] = {
-                "job_id": str(jid),
-                "source_kind": source_kind.value,
-                "embedding_pipeline": resolved.embedding_pipeline,
-                "macro_splitter": resolved.macro_splitter,
-                "embedder": resolved.embedder,
-            }
-            if resolved.embedding_pipeline == "late_chunking":
-                meta["late_chunk_min_tokens"] = resolved.late_chunk_min_tokens
-                meta["late_chunk_max_tokens"] = resolved.late_chunk_max_tokens
-                meta["late_chunk_batch_tokens"] = resolved.late_chunk_batch_tokens
             chunks = 0
-            async for chunk in pipeline.process(raw_text, metadata=meta, embedding_dimensions=dims):
-                await self._sink.emit(jid, chunk)
-                chunks += 1
+            for text_index, raw_text in enumerate(text_segments):
+                meta: dict[str, object] = {
+                    "job_id": str(jid),
+                    "source_kind": source_kind.value,
+                    "embedding_pipeline": resolved.embedding_pipeline,
+                    "macro_splitter": resolved.macro_splitter,
+                    "embedder": resolved.embedder,
+                    "text_index": text_index,
+                }
+                if source_kind == SourceKind.TEXT and len(text_segments) > 1:
+                    meta["text_count"] = len(text_segments)
+                if resolved.embedding_pipeline == "late_chunking":
+                    meta["late_chunk_min_tokens"] = resolved.late_chunk_min_tokens
+                    meta["late_chunk_max_tokens"] = resolved.late_chunk_max_tokens
+                    meta["late_chunk_batch_tokens"] = resolved.late_chunk_batch_tokens
+                async for chunk in pipeline.process(raw_text, metadata=meta, embedding_dimensions=dims):
+                    await self._sink.emit(jid, chunk)
+                    chunks += 1
 
             await self._sink.finalize(jid, metadata={"chunks": str(chunks)})
 

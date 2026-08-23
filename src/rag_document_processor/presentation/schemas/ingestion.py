@@ -147,7 +147,10 @@ class TextIngestRequest(BaseModel):
     texts: list[str] = Field(
         default_factory=list,
         min_length=1,
-        description="One or more UTF-8 text segments to chunk and embed.",
+        description=(
+            "One or more UTF-8 text segments. Each list item is embedded independently "
+            "(short items → one vector each; long items may still be split into multiple chunks)."
+        ),
         examples=[["First chunk of content.", "Second chunk of content."]],
     )
     llama_parse_tier: str | None = Field(

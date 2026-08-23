@@ -1,3 +1,10 @@
+# Shared local infrastructure (Postgres, Redis, MinIO).
+# Not RAG-specific — any local service (including rag-document-processor) can join `shared-net`.
+#
+#   docker compose up -d
+#
+name: shared-infra
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,11 +16,18 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks: [shared-net]
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    networks: [shared-net]
 
   minio:
     image: minio/minio:latest
@@ -26,7 +40,15 @@ services:
       - "9001:9001"
     volumes:
       - miniodata:/data
+    networks: [shared-net]
 
 volumes:
+  # Stable names so data survives compose project renames.
   pgdata:
+    name: rag-document-processor_pgdata
   miniodata:
+    name: rag-document-processor_miniodata
+
+networks:
+  shared-net:
+    name: shared-net

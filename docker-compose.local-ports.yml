@@ -1,0 +1,18 @@
+# Optional override for full-stack local use with docker-compose.prod.yml.
+# Publishes Postgres / Redis / MinIO to the host so GUI tools (e.g. DBeaver) can connect.
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.local-ports.yml up -d
+#
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"

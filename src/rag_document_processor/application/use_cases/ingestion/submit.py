@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -250,9 +251,10 @@ class SubmitTextIngestionUseCase:
         late_chunk_min_tokens: int | str | None = None,
         late_chunk_max_tokens: int | str | None = None,
     ) -> JobCreatedDTO:
-        joined = "\n\n".join(t for t in texts if t)
-        if not joined:
-            joined = ""
+        # Persist as a JSON string list so the worker embeds each segment independently
+        # (joining with blank lines previously collapsed short segments into one chunk).
+        segments = [t for t in texts if t]
+        payload = json.dumps(segments, ensure_ascii=False)
         job_id = uuid4()
         tier = _coerce_llama_parse_tier(llama_parse_tier)
         ep, ms, prov, om, jm, dims, lc_min, lc_max = _prepare_ingest_embedding_fields(
@@ -271,7 +273,7 @@ class SubmitTextIngestionUseCase:
                 job_id=job_id,
                 source_kind=SourceKind.TEXT,
                 status=JobStatus.PENDING,
-                source_text=joined,
+                source_text=payload,
                 content_type="text/plain",
                 llama_parse_tier=tier,
                 embedding_dimensions=dims,

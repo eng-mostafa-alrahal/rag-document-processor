@@ -548,12 +548,86 @@ gcloud run services describe rag-api \
 | Resource | Typical staging cost |
 |----------|---------------------|
 | Cloud Run API | Scales to zero when idle |
-| Cloud Run worker | Always on (`min-instances: 1`) — main ongoing cost |
-| Cloud SQL `db-f1-micro` | ~$7–10/month |
+| Cloud Run worker | Always on (`min-instances: 1`) — main ongoing cost (~$50–90/month) |
+| Cloud SQL `db-f1-micro` | ~$8–15/month while running |
 | Redis Cloud | Free tier often sufficient |
 | GCS | Pennies for small uploads |
 
-Delete the old GCP VM if you migrated from the legacy SSH deploy.
+**For students / prototypes:** do **not** leave the stack running. Develop with Docker Compose locally ([ONBOARDING.md](./ONBOARDING.md)). Deploy to Cloud Run only for a one-day demo, then tear everything down (next section).
+
+Delete any leftover Compute Engine VM from the legacy SSH deploy — it bills even when unused.
+
+---
+
+## Tear down (stop all GCP charges)
+
+Use this when you no longer need a live staging environment. Data in Cloud SQL and the uploads bucket will be **deleted**.
+
+### 1. Disable auto-redeploy
+
+In GitHub: **Actions → Deploy → ⋯ → Disable workflow**.  
+Otherwise a push to `stage` will recreate Cloud Run services.
+
+### 2. Delete Cloud resources
+
+```bash
+export GCP_PROJECT_ID=YOUR_PROJECT_ID
+export GCP_REGION=us-central1
+gcloud config set project "$GCP_PROJECT_ID"
+
+# Cloud Run
+gcloud run services delete rag-api --region "$GCP_REGION" --quiet
+gcloud run services delete rag-worker --region "$GCP_REGION" --quiet
+
+# Cloud SQL (database gone)
+gcloud sql instances delete rag-sql --quiet
+
+# Uploads bucket (optional but recommended — replace with your bucket name)
+# gcloud storage rm -r gs://${GCP_PROJECT_ID}-rag-uploads
+
+# Leftover VM from legacy deploy (if any)
+gcloud compute instances list
+# gcloud compute instances delete INSTANCE_NAME --zone=ZONE --quiet
+```
+
+PowerShell: same commands with `$env:GCP_PROJECT_ID = "..."` and `` ` `` line continuations if needed.
+
+### 3. What you can keep
+
+| Keep | Why |
+|------|-----|
+| GCP project + billing account | Empty project ≈ $0; easier one-day redeploy |
+| GitHub secrets | Reuse on next deploy |
+| Redis Cloud free DB | Usually $0 |
+| Artifact Registry images | Tiny cost; delete the `rag` repo if you want $0 |
+
+```bash
+# Optional: remove Docker images storage
+gcloud artifacts repositories delete rag --location="$GCP_REGION" --quiet
+```
+
+### 4. Confirm ~$0
+
+```bash
+gcloud run services list --region "$GCP_REGION"
+gcloud sql instances list
+gcloud compute instances list
+```
+
+All should be empty. Check **Billing → Reports** after 1–2 days.
+
+---
+
+## One-day demo redeploy
+
+1. Re-enable the **Deploy** workflow (or run it via `workflow_dispatch` on `stage`).
+2. Recreate infrastructure if you deleted it: run `scripts/setup-gcp-cloudrun.sh` (Cloud SQL, GCS, Artifact Registry) — see Phase 1 above.
+3. Restore GitHub secrets (`DATABASE_URL*`, `CLOUD_SQL_CONNECTION_NAME`, `S3_*`, etc.) if anything changed.
+4. Push to `stage` (or **Actions → Deploy → Run workflow**).
+5. Create an API key (Phase 4).
+6. Demo, then run **Tear down** again the same day.
+
+Local day-to-day work stays on Docker Compose — no need for GCP to be up.
 
 ---
 

@@ -10,6 +10,16 @@ FastAPI API + Celery workers: ingest **file / URL / text** → extract → embed
 
 ## Commands (from repo root)
 
+**Shared local Docker** (infra is generic `shared-infra`; app is `rag-app`):
+
+```bash
+docker compose up -d                                      # shared-infra: Postgres, Redis, MinIO on shared-net
+docker compose -f docker-compose.app.yml up -d --build    # rag-app: API + worker
+docker compose -f docker-compose.app.yml exec api python scripts/create_api_key.py "dev"
+```
+
+**Hybrid** (infra in Docker, API/worker on host):
+
 ```bash
 uv sync --extra dev
 docker compose up -d
@@ -19,7 +29,7 @@ uv run celery -A rag_document_processor.workers.celery_app worker -l info
 uv run pytest tests/unit -q
 ```
 
-Windows Celery: add `--pool=solo` if the default pool fails.
+Windows Celery (host): add `--pool=solo` if the default pool fails.
 
 ## Layout
 
