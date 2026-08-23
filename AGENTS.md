@@ -49,6 +49,8 @@ Windows Celery (host): add `--pool=solo` if the default pool fails.
 - Worker: `application/use_cases/ingestion/process_job.py`.
 - Public ingest body uses **`embedding_model`** (one field); DB still stores provider-specific columns internally.
 - Dimension validation: `core/embedding_dimensions.py`; discovery route: `GET /api/v1/embeddings/dimension-constraints`.
+- **Late chunking:** macro split (recursive / token_aware / semantic) → enhance (min/max tokens) → batch → **one Jina request per batch** (`late_chunking=true`).
+- **Pipeline diagrams:** `docs/PIPELINES.md` (`chunk_then_embed`, `late_chunking`, macro splitters, extraction).
 
 ## Config
 

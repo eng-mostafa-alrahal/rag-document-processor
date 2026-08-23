@@ -28,8 +28,10 @@ _EMBED_PIPE_DESC = (
     "late_chunking uses Jina only; chunk_then_embed can use OpenAI or Jina."
 )
 _MACRO_DESC = (
-    "Macro document splitter; omit to use MACRO_SPLITTER from env. "
-    f"Allowed values: {_MACRO_VALUES}."
+    "Macro document splitter for late_chunking (produces chunk text before enhance); "
+    "omit to use MACRO_SPLITTER from env. "
+    f"Allowed values: {_MACRO_VALUES}. "
+    "Ignored for chunk_then_embed."
 )
 _PROVIDER_DESC = (
     "Embedder for chunk_then_embed; omit to auto-pick when API keys are configured "
@@ -49,12 +51,12 @@ _EMBEDDING_DIM_DESC = (
     "requested_dimensions, and allowed_dimensions_min/max when the value does not match the model."
 )
 _LATE_CHUNK_MIN_DESC = (
-    "late_chunking only: minimum tokens before a merged chunk may be finalized. Higher values mean fewer, "
-    "denser chunks (better RAG). Omit to use LATE_CHUNK_MIN_TOKENS from env. Must be <= late_chunk_max_tokens."
+    "late_chunking only: minimum tokens per chunk after enhance. Higher values mean fewer, denser chunks. "
+    "Omit to use LATE_CHUNK_MIN_TOKENS from env. Must be <= late_chunk_max_tokens."
 )
 _LATE_CHUNK_MAX_DESC = (
-    "late_chunking only: maximum tokens per merged chunk. Omit to use LATE_CHUNK_MAX_TOKENS from env. "
-    "Ignored for chunk_then_embed."
+    "late_chunking only: maximum tokens per chunk after enhance (also sizes recursive/token_aware macro windows). "
+    "Omit to use LATE_CHUNK_MAX_TOKENS from env. Ignored for chunk_then_embed."
 )
 
 # Shared OpenAPI hints for multipart /file (keep in sync with JSON body fields above).
@@ -269,10 +271,10 @@ class JobStatusResponse(BaseModel):
         description="Effective embedding model id for the active provider (after overrides and env defaults).",
     )
     late_chunk_min_tokens: int = Field(
-        description="Effective minimum tokens per merged chunk for late_chunking (stored override or env default).",
+        description="Effective minimum tokens per chunk after enhance for late_chunking (stored override or env default).",
     )
     late_chunk_max_tokens: int = Field(
-        description="Effective maximum tokens per merged chunk for late_chunking (stored override or env default).",
+        description="Effective maximum tokens per chunk after enhance for late_chunking (stored override or env default).",
     )
     created_at: str = Field(description="ISO 8601 timestamp when the job was created.")
     updated_at: str = Field(description="ISO 8601 timestamp of the last status update.")

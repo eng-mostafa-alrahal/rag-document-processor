@@ -41,13 +41,13 @@ Pipeline-only: **no Postgres, Redis, Celery, or Docker**. Fake embedder by defau
 
 1. `uv sync --extra dev`
 2. Open **Run and Debug** (`Ctrl+Shift+D`) → **Debug: late-chunk (no Docker)** → **F5**
-3. Set breakpoints in `LateChunkingPipeline.process`, `merge_segments`, `batch_chunks`, or `macro_splitters.py`
+3. Set breakpoints in `LateChunkingPipeline.process`, `enhance_chunks`, `batch_chunks`, or `macro_splitters.py`
 
 Other no-Docker configs:
 
 | Configuration | Use when |
 |---------------|----------|
-| **Debug: late-chunk (no Docker)** | Built-in sample text; split → merge → batch |
+| **Debug: late-chunk (no Docker)** | Built-in sample text; macro → enhance → batch |
 | **Debug: late-chunk + file (no Docker)** | Prompts for a `.txt` / `.md` / `.pdf` / `.docx` path |
 | **Debug: late-chunk + Jina (no Docker)** | Real Jina call (needs `JINA_API_KEY` in `.env` only) |
 
@@ -109,6 +109,7 @@ See `.env.example`. Key settings:
 - `STORAGE_BACKEND=local|s3`
 - `EMBEDDING_PIPELINE=late_chunking|chunk_then_embed`
 - `MACRO_SPLITTER=semantic|recursive|token_aware`
+- `LATE_CHUNK_MIN_TOKENS` / `LATE_CHUNK_MAX_TOKENS` / `LATE_CHUNK_BATCH_TOKENS` — late_chunking only (macro → enhance → one Jina call per batch); see **[docs/PIPELINES.md](docs/PIPELINES.md)**
 - `EMBEDDING_DIMENSIONS` — optional default output size when a job omits `embedding_dimensions` (must fit the active embedder model)
 - Jina / OpenAI keys when using those embedders
 - `LLAMA_CLOUD_API_KEY` / `LLAMA_PARSE_TIER` — optional cloud PDF/DOCX parse; tier defaults from env, overridable per ingest request

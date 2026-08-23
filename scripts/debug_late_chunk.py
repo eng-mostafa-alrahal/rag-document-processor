@@ -4,7 +4,7 @@ No Postgres, Redis, or Jina required in the default (fake embedder) mode.
 
 Breakpoints:
   - infrastructure/pipelines/embedding_pipelines.py (LateChunkingPipeline)
-  - infrastructure/pipelines/late_chunk_enhancer.py (merge + batch)
+  - infrastructure/pipelines/late_chunk_enhancer.py (enhance + batch)
   - infrastructure/splitters/macro_splitters.py
 
 Usage (from repo root):
@@ -123,7 +123,11 @@ def _build_offline_pipeline(
     use_jina: bool,
     httpx_client: httpx.AsyncClient,
 ) -> tuple[LateChunkingPipeline, _FakeEmbedder | None, str]:
-    macro_splitter = build_macro_splitter(settings, macro)
+    macro_splitter = build_macro_splitter(
+        settings,
+        macro,
+        max_tokens=max_tokens,
+    )
 
     if use_jina:
         if not settings.jina_api_key:

@@ -73,23 +73,22 @@ class Settings(BaseSettings):
     )
     embedder_context_tokens: int = Field(default=8192, alias="EMBEDDER_CONTEXT_TOKENS")
 
-    # Late-chunking enhance + batch controls. Merge tiny fragments into denser
-    # chunks (better RAG), then pack chunks into Jina requests under a token
-    # budget so late chunking keeps shared context. min/max are per-job override-able.
+    # Late-chunking: macro split → enhance (min/max per chunk) → batch into Jina
+    # requests (one API call per batch under LATE_CHUNK_BATCH_TOKENS).
     late_chunk_min_tokens: int = Field(
         default=256,
         alias="LATE_CHUNK_MIN_TOKENS",
-        description="Late-chunking: minimum tokens before a merged chunk may be finalized (avoid tiny chunks).",
+        description="Late-chunking: minimum tokens per chunk after enhance (avoid tiny chunks).",
     )
     late_chunk_max_tokens: int = Field(
         default=512,
         alias="LATE_CHUNK_MAX_TOKENS",
-        description="Late-chunking: maximum tokens per merged chunk.",
+        description="Late-chunking: maximum tokens per chunk after enhance; also sizes recursive/token_aware macro windows.",
     )
     late_chunk_batch_tokens: int = Field(
         default=7000,
         alias="LATE_CHUNK_BATCH_TOKENS",
-        description="Late-chunking: max total tokens per Jina request (shared-context batch budget; keep under model limit).",
+        description="Late-chunking: max total tokens per Jina request (one late_chunking=true call per batch; keep under model context).",
     )
 
     jina_api_key: str | None = Field(default=None, alias="JINA_API_KEY")

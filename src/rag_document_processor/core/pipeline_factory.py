@@ -8,7 +8,7 @@ from rag_document_processor.core.ingest_embedding_options import MacroKind, Reso
 from rag_document_processor.infrastructure.embedders.jina_embedder import JinaEmbedder
 from rag_document_processor.infrastructure.embedders.openai_embedder import OpenAIEmbedder
 from rag_document_processor.infrastructure.pipelines.embedding_pipelines import ChunkThenEmbedPipeline, LateChunkingPipeline
-from rag_document_processor.infrastructure.pipelines.late_chunk_enhancer import make_token_counter
+from rag_document_processor.infrastructure.pipelines.late_chunk_enhancer import chars_for_tokens, make_token_counter
 from rag_document_processor.infrastructure.splitters.macro_splitters import (
     RecursiveMacroSplitter,
     SemanticMacroSplitter,
@@ -16,15 +16,31 @@ from rag_document_processor.infrastructure.splitters.macro_splitters import (
 )
 from rag_document_processor.infrastructure.splitters.sentence_chunker import RecursiveSentenceChunker
 
+# Small overlap between consecutive macro chunks (late_chunking only).
+DEFAULT_MACRO_OVERLAP_TOKENS = 128
 
-def build_macro_splitter(settings: Settings, macro: MacroKind) -> IMacroSplitter:
+
+def build_macro_splitter(
+    settings: Settings,
+    macro: MacroKind,
+    *,
+    max_tokens: int,
+    overlap_tokens: int = DEFAULT_MACRO_OVERLAP_TOKENS,
+) -> IMacroSplitter:
+    """Build a macro splitter sized for late-chunking chunk candidates."""
     if macro == "semantic":
         if not settings.openai_api_key:
-            return RecursiveMacroSplitter()
+            return RecursiveMacroSplitter(
+                chunk_size=chars_for_tokens(max_tokens),
+                chunk_overlap=chars_for_tokens(overlap_tokens),
+            )
         return SemanticMacroSplitter(openai_api_key=settings.openai_api_key)
     if macro == "token_aware":
-        return TokenAwareMacroSplitter(max_tokens=settings.embedder_context_tokens)
-    return RecursiveMacroSplitter()
+        return TokenAwareMacroSplitter(max_tokens=max_tokens, overlap_tokens=overlap_tokens)
+    return RecursiveMacroSplitter(
+        chunk_size=chars_for_tokens(max_tokens),
+        chunk_overlap=chars_for_tokens(overlap_tokens),
+    )
 
 
 def build_embedding_pipeline(
@@ -32,8 +48,13 @@ def build_embedding_pipeline(
     httpx_client: httpx.AsyncClient,
     resolved: ResolvedIngestEmbeddingOptions,
 ) -> IEmbeddingPipeline:
-    macro = build_macro_splitter(settings, resolved.macro_splitter)
     if resolved.embedding_pipeline == "late_chunking":
+        macro = build_macro_splitter(
+            settings,
+            resolved.macro_splitter,
+            max_tokens=resolved.late_chunk_max_tokens,
+            overlap_tokens=DEFAULT_MACRO_OVERLAP_TOKENS,
+        )
         embedder = JinaEmbedder(
             api_key=settings.jina_api_key or "",
             model=resolved.jina_embedding_model,

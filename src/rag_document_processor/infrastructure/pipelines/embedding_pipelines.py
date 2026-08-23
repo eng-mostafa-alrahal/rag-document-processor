@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -8,39 +7,20 @@ from rag_document_processor.application.ports.embedding_pipeline import IEmbedde
 from rag_document_processor.domain.value_objects.embedded_chunk import EmbeddedChunk
 from rag_document_processor.infrastructure.pipelines.late_chunk_enhancer import (
     TokenCounter,
+    _dedupe_adjacent,
     batch_chunks,
-    merge_segments,
+    enhance_chunks,
     simple_token_count,
 )
 
 
-def _sentences(block: str) -> list[str]:
-    text = block.strip()
-    if not text:
-        return []
-    parts = re.split(r"(?<=[.!?])\s+|\n{2,}", text)
-    out = [p.strip() for p in parts if p.strip()]
-    if not out:
-        return [text]
-    return out
-
-
-def _dedupe_adjacent(segments: list[str]) -> list[str]:
-    """Drop consecutive duplicate segments (macro splitters overlap by design)."""
-    out: list[str] = []
-    for seg in segments:
-        if out and out[-1] == seg:
-            continue
-        out.append(seg)
-    return out
-
-
 class LateChunkingPipeline(IEmbeddingPipeline):
-    """Late chunking with enhance + token-aware batching.
+    """Late chunking with macro split → enhance → batch → Jina.
 
-    Flow: macro split -> sentence segments -> ENHANCE (merge tiny fragments into
-    denser chunks) -> BATCH (pack chunks under the Jina token budget) -> one
-    ``late_chunking=true`` request per batch so vectors share context.
+    Flow: macro splitter produces chunk text (recursive / token_aware / semantic,
+    with optional overlap) → ENHANCE enforces ``min_tokens``..``max_tokens`` →
+    BATCH packs under the Jina request budget → one ``late_chunking=true`` call
+    per batch so vectors share context.
     """
 
     name = "late_chunking"
@@ -73,17 +53,18 @@ class LateChunkingPipeline(IEmbeddingPipeline):
         if embedding_dimensions is not None:
             meta["embedding_dimensions"] = embedding_dimensions
 
-        # 1. Collect base segments (sentences) across all macro blocks.
-        segments: list[str] = []
+        # 1. Macro split: each yielded block is one chunk candidate (may overlap).
+        macro_chunks: list[str] = []
         async for block in self._macro.split(text):
-            segments.extend(_sentences(block))
-        segments = _dedupe_adjacent(segments)
-        if not segments:
+            if block.strip():
+                macro_chunks.append(block.strip())
+        macro_chunks = _dedupe_adjacent(macro_chunks)
+        if not macro_chunks:
             return
 
-        # 2. ENHANCE: merge tiny fragments into denser chunks.
-        chunks = merge_segments(
-            segments,
+        # 2. ENHANCE: enforce min/max token bounds on macro output.
+        chunks = enhance_chunks(
+            macro_chunks,
             min_tokens=self._min_tokens,
             max_tokens=self._max_tokens,
             count_tokens=self._count_tokens,

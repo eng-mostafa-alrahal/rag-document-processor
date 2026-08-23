@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from rag_document_processor.infrastructure.pipelines.embedding_pipelines import _sentences
+from rag_document_processor.infrastructure.pipelines.late_chunk_enhancer import _sentences
 
 
 def test_sentences_splits_on_period() -> None:

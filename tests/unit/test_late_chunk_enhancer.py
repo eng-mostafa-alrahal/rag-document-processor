@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rag_document_processor.infrastructure.pipelines.late_chunk_enhancer import (
     batch_chunks,
+    enhance_chunks,
     merge_segments,
     simple_token_count,
 )
@@ -61,3 +62,18 @@ def test_batch_all_fit_single_batch() -> None:
     chunks = ["a", "b", "c"]
     batches = batch_chunks(chunks, max_batch_tokens=100, count_tokens=_wc)
     assert batches == [["a", "b", "c"]]
+
+
+def test_enhance_splits_oversized_macro_chunk() -> None:
+    # One macro block with four short sentences; max 4 words => two chunks.
+    macro = ["Alpha one. Beta two. Gamma three. Delta four."]
+    out = enhance_chunks(macro, min_tokens=1, max_tokens=4, count_tokens=_wc)
+    assert len(out) == 2
+    assert _wc(out[0]) <= 4
+    assert _wc(out[1]) <= 4
+
+
+def test_enhance_merges_undersized_adjacent_macro_chunks() -> None:
+    macro = ["aa bb", "cc dd"]
+    out = enhance_chunks(macro, min_tokens=4, max_tokens=8, count_tokens=_wc)
+    assert out == ["aa bb\ncc dd"]

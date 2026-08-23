@@ -1,13 +1,13 @@
 """Enhance + batch helpers for the late-chunking pipeline.
 
-Late chunking only adds value when several related segments share a single Jina
+Late chunking only adds value when several related chunks share a single Jina
 request (the model attends across the whole ``input`` array, then returns one
-vector per item). Two pure steps prepare segments for that:
+vector per item). Two steps prepare macro-splitter output for that:
 
-1. ENHANCE (`merge_segments`): greedily merge adjacent fragments so we emit
-   fewer, denser chunks (good for RAG) instead of one vector per sentence.
-2. BATCH (`batch_chunks`): pack merged chunks into per-request groups that stay
-   under the Jina token budget, so each API call keeps maximal shared context.
+1. ENHANCE (`enhance_chunks`): normalize macro-splitter chunks to
+   ``min_tokens``..``max_tokens`` (split oversized, merge undersized).
+2. BATCH (`batch_chunks`): pack chunks into per-request groups under the Jina
+   batch token budget so each API call keeps maximal shared context.
 
 Token counting is injected as a callable so these functions stay pure and
 testable; production wires a tiktoken-backed counter via `make_token_counter`.
@@ -22,6 +22,9 @@ from functools import lru_cache
 TokenCounter = Callable[[str], int]
 
 _WORD_RE = re.compile(r"\S+")
+
+# Rough chars-per-token for LlamaIndex SentenceSplitter sizing in recursive macro.
+_CHARS_PER_TOKEN = 4
 
 
 def simple_token_count(text: str) -> int:
@@ -49,6 +52,32 @@ def make_token_counter(model: str = "gpt-4o-mini") -> TokenCounter:
     return _count
 
 
+def chars_for_tokens(tokens: int) -> int:
+    """Approximate character budget from a token limit (recursive macro splitter)."""
+    return max(1, tokens * _CHARS_PER_TOKEN)
+
+
+def _sentences(block: str) -> list[str]:
+    text = block.strip()
+    if not text:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+|\n{2,}", text)
+    out = [p.strip() for p in parts if p.strip()]
+    if not out:
+        return [text]
+    return out
+
+
+def _dedupe_adjacent(segments: list[str]) -> list[str]:
+    """Drop consecutive duplicate segments (macro splitters overlap by design)."""
+    out: list[str] = []
+    for seg in segments:
+        if out and out[-1] == seg:
+            continue
+        out.append(seg)
+    return out
+
+
 def merge_segments(
     segments: list[str],
     *,
@@ -57,7 +86,7 @@ def merge_segments(
     count_tokens: TokenCounter = simple_token_count,
     join_with: str = "\n",
 ) -> list[str]:
-    """Merge adjacent fragments into denser chunks.
+    """Merge adjacent fragments into denser chunks within token bounds.
 
     Greedy rule (no similarity model):
       - Accumulate segments into the current chunk while staying <= ``max_tokens``.
@@ -94,8 +123,6 @@ def merge_segments(
             current = seg
             current_tokens = seg_tokens
         else:
-            # Current chunk is too small to stand alone: force-merge to avoid a
-            # tiny fragment, then finalize.
             current = f"{current}{join_with}{seg}"
             chunks.append(current)
             current = ""
@@ -104,12 +131,56 @@ def merge_segments(
     if current:
         chunks.append(current)
 
-    # Fold a trailing sub-min chunk back into its predecessor.
     if len(chunks) >= 2 and count_tokens(chunks[-1]) < min_tokens:
         tail = chunks.pop()
         chunks[-1] = f"{chunks[-1]}{join_with}{tail}"
 
     return chunks
+
+
+def _split_oversized(
+    chunk: str,
+    *,
+    max_tokens: int,
+    count_tokens: TokenCounter,
+) -> list[str]:
+    """Break a single macro chunk above ``max_tokens`` into smaller pieces."""
+    if count_tokens(chunk) <= max_tokens:
+        return [chunk]
+    parts = _sentences(chunk)
+    if len(parts) <= 1:
+        return [chunk]
+    return merge_segments(parts, min_tokens=1, max_tokens=max_tokens, count_tokens=count_tokens)
+
+
+def enhance_chunks(
+    chunks: list[str],
+    *,
+    min_tokens: int,
+    max_tokens: int,
+    count_tokens: TokenCounter = simple_token_count,
+    join_with: str = "\n",
+) -> list[str]:
+    """Normalize macro-splitter output to ``min_tokens``..``max_tokens`` per chunk.
+
+    1. Sub-split any chunk above ``max_tokens`` (sentence-aware).
+    2. Drop consecutive duplicates from macro overlap.
+    3. Merge adjacent fragments so each final chunk respects min/max bounds.
+    """
+    expanded: list[str] = []
+    for chunk in chunks:
+        if chunk and chunk.strip():
+            expanded.extend(
+                _split_oversized(chunk.strip(), max_tokens=max_tokens, count_tokens=count_tokens)
+            )
+    expanded = _dedupe_adjacent(expanded)
+    return merge_segments(
+        expanded,
+        min_tokens=min_tokens,
+        max_tokens=max_tokens,
+        count_tokens=count_tokens,
+        join_with=join_with,
+    )
 
 
 def batch_chunks(
