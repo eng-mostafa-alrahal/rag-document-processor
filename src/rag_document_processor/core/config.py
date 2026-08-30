@@ -66,22 +66,22 @@ class Settings(BaseSettings):
     )
 
     embedding_pipeline: Literal["late_chunking", "chunk_then_embed"] = Field(
-        default="chunk_then_embed", alias="EMBEDDING_PIPELINE"
+        default="late_chunking", alias="EMBEDDING_PIPELINE"
     )
     macro_splitter: Literal["semantic", "recursive", "token_aware"] = Field(
-        default="recursive", alias="MACRO_SPLITTER"
+        default="semantic", alias="MACRO_SPLITTER"
     )
     embedder_context_tokens: int = Field(default=8192, alias="EMBEDDER_CONTEXT_TOKENS")
 
     # Late-chunking: macro split → enhance (min/max per chunk) → batch into Jina
     # requests (one API call per batch under LATE_CHUNK_BATCH_TOKENS).
     late_chunk_min_tokens: int = Field(
-        default=256,
+        default=800,
         alias="LATE_CHUNK_MIN_TOKENS",
         description="Late-chunking: minimum tokens per chunk after enhance (avoid tiny chunks).",
     )
     late_chunk_max_tokens: int = Field(
-        default=512,
+        default=2000,
         alias="LATE_CHUNK_MAX_TOKENS",
         description="Late-chunking: maximum tokens per chunk after enhance; also sizes recursive/token_aware macro windows.",
     )
@@ -128,7 +128,7 @@ class Settings(BaseSettings):
                 object.__setattr__(
                     self,
                     "database_url",
-                    "postgresql+asyncpg://rag:rag@localhost:5432/rag",
+                    "postgresql+asyncpg://postgres:postgres@localhost:5432/rag",
                 )
             if not self.api_key_admin_secret:
                 object.__setattr__(self, "api_key_admin_secret", "dev-only-admin-secret-change-me")

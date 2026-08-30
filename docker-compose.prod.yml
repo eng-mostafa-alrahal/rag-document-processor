@@ -5,13 +5,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: rag
-      POSTGRES_PASSWORD: rag
-      POSTGRES_DB: rag
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,8 +40,8 @@ services:
       ENV: production
       DATABASE_AUTO_CREATE: "true"
       DATABASE_AUTO_MIGRATE: "true"
-      DATABASE_URL: postgresql+asyncpg://rag:rag@postgres:5432/rag
-      DATABASE_URL_SYNC: postgresql://rag:rag@postgres:5432/rag
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/rag
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@postgres:5432/rag
       REDIS_URL: redis://redis:6379/0
       REDIS_STREAM_DB: "0"
       CELERY_BROKER_URL: redis://redis:6379/1
@@ -76,8 +76,8 @@ services:
     env_file: .env
     environment:
       ENV: production
-      DATABASE_URL: postgresql+asyncpg://rag:rag@postgres:5432/rag
-      DATABASE_URL_SYNC: postgresql://rag:rag@postgres:5432/rag
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/rag
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@postgres:5432/rag
       REDIS_URL: redis://redis:6379/0
       REDIS_STREAM_DB: "0"
       CELERY_BROKER_URL: redis://redis:6379/1

@@ -37,9 +37,11 @@ gcloud sql instances create "$SQL_INSTANCE" \
   --root-password="${SQL_ROOT_PASSWORD:?Set SQL_ROOT_PASSWORD}" 2>/dev/null || true
 
 gcloud sql databases create rag --instance="$SQL_INSTANCE" 2>/dev/null || true
-gcloud sql users create rag \
+# Default Cloud SQL Postgres user is "postgres" (password = SQL_ROOT_PASSWORD from instance create).
+# Re-apply password so re-runs stay consistent with DATABASE_URL secrets.
+gcloud sql users set-password postgres \
   --instance="$SQL_INSTANCE" \
-  --password="${SQL_RAG_PASSWORD:?Set SQL_RAG_PASSWORD}" 2>/dev/null || true
+  --password="${SQL_ROOT_PASSWORD}" 2>/dev/null || true
 
 CONNECTION_NAME=$(gcloud sql instances describe "$SQL_INSTANCE" --format='value(connectionName)')
 echo "Cloud SQL connection: $CONNECTION_NAME"
@@ -74,8 +76,8 @@ cat <<EOF
    GCP_SA_KEY=<contents of $KEY_FILE>
    CLOUD_SQL_CONNECTION_NAME=$CONNECTION_NAME
 
-   DATABASE_URL=postgresql+asyncpg://rag:YOUR_PASSWORD@/rag?host=/cloudsql/$CONNECTION_NAME
-   DATABASE_URL_SYNC=postgresql://rag:YOUR_PASSWORD@/rag?host=/cloudsql/$CONNECTION_NAME
+   DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@/rag?host=/cloudsql/$CONNECTION_NAME
+   DATABASE_URL_SYNC=postgresql://postgres:YOUR_PASSWORD@/rag?host=/cloudsql/$CONNECTION_NAME
 
    REDIS_URL=<your Redis Cloud URL>
    CELERY_BROKER_URL=<redis url db 1>

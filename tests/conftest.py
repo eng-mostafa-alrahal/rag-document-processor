@@ -12,7 +12,7 @@ def _default_env(monkeypatch: pytest.MonkeyPatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv(
         "DATABASE_URL",
-        os.environ.get("DATABASE_URL", "postgresql+asyncpg://rag:rag@localhost:5432/rag"),
+        os.environ.get("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/rag"),
     )
     monkeypatch.setenv(
         "API_KEY_ADMIN_SECRET",

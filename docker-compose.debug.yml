@@ -7,7 +7,7 @@
 # On your laptop (PowerShell / terminal):
 #   ssh -L 5432:localhost:5432 -L 6379:localhost:6379 -L 9001:localhost:9001 USER@VM_IP
 #
-# Then connect GUI tools to localhost (Postgres: rag/rag, Redis: no password,
+# Then connect GUI tools to localhost (Postgres: postgres/postgres, Redis: no password,
 # MinIO console: http://localhost:9001 — minioadmin/minioadmin).
 services:
   postgres:

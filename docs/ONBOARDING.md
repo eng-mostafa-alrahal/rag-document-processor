@@ -37,7 +37,7 @@ Welcome. This guide orients you to the codebase, local development, and how we e
    ```bash
    docker compose -f docker-compose.app.yml exec api python scripts/create_api_key.py "dev"
    ```
-6. **Inspect Postgres (DBeaver):** Host `localhost`, Port `5432`, Database `rag`, User `rag`, Password `rag`. Tables: `api_keys`, `ingestion_jobs`.
+6. **Inspect Postgres (DBeaver):** Host `localhost`, Port `5432`, Database `rag` (app DB; auto-created if missing), User `postgres`, Password `postgres`. Tables: `api_keys`, `ingestion_jobs`.
 7. **Inspect Redis:** Host `localhost`, Port `6379`, no password.
    - DB **0** = embedding streams (`ingest:{job_id}`), **1** = Celery broker, **2** = Celery results.
 8. Stop **only this app** (shared DB/Redis stay up for other services):
@@ -56,7 +56,7 @@ Legacy all-in-one file: `docker-compose.prod.yml` (optional `docker-compose.loca
 
 2. **Environment**
    - Copy `.env.example` → `.env`.
-   - Defaults match `docker compose` (Postgres `rag`/`rag`, Redis `localhost:6379`).
+   - Defaults match `docker compose` (Postgres user/password `postgres`/`postgres`, Redis `localhost:6379`).
    - For **cloud Redis** instead of the compose Redis service: use the full URL including DB index; ensure **broker**, **results**, and **stream** DB indices match (see `.env.example` comments).
 
 3. **Infrastructure** (Postgres + Redis + MinIO)

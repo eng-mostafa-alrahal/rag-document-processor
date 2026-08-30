@@ -30,7 +30,7 @@ Pick values now and write them down (you will reuse them):
 ```text
 GCP_PROJECT_ID     = my-rag-project-123
 GCP_REGION         = us-central1
-SQL_RAG_PASSWORD   = (long random password for DB user "rag")
+SQL_ROOT_PASSWORD  = (long random password for Cloud SQL user "postgres")
 API_KEY_ADMIN_SECRET = (long random string for admin API key management)
 ```
 
@@ -98,8 +98,7 @@ This script enables APIs, creates Artifact Registry, Cloud SQL, a GCS bucket, an
 ```bash
 export GCP_PROJECT_ID=YOUR_PROJECT_ID
 export GCP_REGION=us-central1
-export SQL_ROOT_PASSWORD='choose-a-strong-root-password'
-export SQL_RAG_PASSWORD='choose-a-strong-rag-password'
+export SQL_ROOT_PASSWORD='choose-a-strong-postgres-password'
 
 chmod +x scripts/setup-gcp-cloudrun.sh
 ./scripts/setup-gcp-cloudrun.sh
@@ -110,8 +109,7 @@ chmod +x scripts/setup-gcp-cloudrun.sh
 ```powershell
 $env:GCP_PROJECT_ID = "YOUR_PROJECT_ID"
 $env:GCP_REGION = "us-central1"
-$env:SQL_ROOT_PASSWORD = "choose-a-strong-root-password"
-$env:SQL_RAG_PASSWORD = "choose-a-strong-rag-password"
+$env:SQL_ROOT_PASSWORD = "choose-a-strong-postgres-password"
 
 bash scripts/setup-gcp-cloudrun.sh
 ```
@@ -149,7 +147,8 @@ gcloud sql instances create rag-sql \
   --region=us-central1 --root-password='ROOT_PASSWORD'
 
 gcloud sql databases create rag --instance=rag-sql
-gcloud sql users create rag --instance=rag-sql --password='RAG_PASSWORD'
+# Default user is "postgres"; password matches --root-password above
+gcloud sql users set-password postgres --instance=rag-sql --password='POSTGRES_PASSWORD'
 
 gcloud storage buckets create gs://YOUR_PROJECT_ID-rag-uploads --location=us-central1
 
@@ -198,20 +197,20 @@ You will add these to GitHub as:
 
 ### Step 5 — Build your database URLs
 
-Use the **Cloud SQL connection name** from Step 3 and the **rag user password** you chose.
+Use the **Cloud SQL connection name** from Step 3 and the **`postgres` user password** you chose (`SQL_ROOT_PASSWORD`).
 
 Format (replace `PASSWORD` and `CONNECTION_NAME`):
 
 ```text
-postgresql+asyncpg://rag:PASSWORD@/rag?host=/cloudsql/CONNECTION_NAME
-postgresql://rag:PASSWORD@/rag?host=/cloudsql/CONNECTION_NAME
+postgresql+asyncpg://postgres:PASSWORD@/rag?host=/cloudsql/CONNECTION_NAME
+postgresql://postgres:PASSWORD@/rag?host=/cloudsql/CONNECTION_NAME
 ```
 
 **Example** (password `MyStr0ng!Pass`, connection `my-project:us-central1:rag-sql`):
 
 ```text
-postgresql+asyncpg://rag:MyStr0ng!Pass@/rag?host=/cloudsql/my-project:us-central1:rag-sql
-postgresql://rag:MyStr0ng!Pass@/rag?host=/cloudsql/my-project:us-central1:rag-sql
+postgresql+asyncpg://postgres:MyStr0ng!Pass@/rag?host=/cloudsql/my-project:us-central1:rag-sql
+postgresql://postgres:MyStr0ng!Pass@/rag?host=/cloudsql/my-project:us-central1:rag-sql
 ```
 
 > Special characters in passwords (`@`, `#`, `!`) must be URL-encoded in the connection string, or use a password without those characters.
@@ -412,7 +411,7 @@ uv sync
 3. Set env vars (replace with your real values):
 
 ```bash
-export DATABASE_URL_SYNC="postgresql://rag:PASSWORD@/rag?host=/cloudsql/PROJECT:REGION:rag-sql"
+export DATABASE_URL_SYNC="postgresql://postgres:PASSWORD@/rag?host=/cloudsql/PROJECT:REGION:rag-sql"
 export API_KEY_ADMIN_SECRET="your-admin-secret-from-github"
 ```
 
@@ -428,7 +427,7 @@ chmod +x cloud-sql-proxy
 sleep 3
 
 # Use TCP locally instead of socket for the script
-export DATABASE_URL_SYNC="postgresql://rag:PASSWORD@127.0.0.1:5432/rag"
+export DATABASE_URL_SYNC="postgresql://postgres:PASSWORD@127.0.0.1:5432/rag"
 uv run python scripts/create_api_key.py "production client"
 ```
 
